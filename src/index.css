@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── 컬러 팔레트 ── */
+  --color-bg:        #080C17;
+  --color-surface:   #0E1525;
+  --color-card:      #111827;
+  --color-border:    rgba(255,255,255,0.07);
+  --color-border-hv: rgba(255,255,255,0.14);
+
+  --color-text:      #E2E8F0;
+  --color-sub:       #8892A8;
+  --color-muted:     #4B5675;
+
+  --color-up:        #00C896;
+  --color-down:      #FF4B4B;
+  --color-gold:      #F0B429;
+  --color-blue:      #3D8EFF;
+
+  /* ── 폰트 ── */
+  --font-sans: 'Pretendard', -apple-system, sans-serif;
+
+  /* ── 반응형 ── */
+  --breakpoint-mobile: 768px;
+}
+
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* 스크롤바 */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  /* 숫자 폰트 */
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  /* 스피너 */
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+}
