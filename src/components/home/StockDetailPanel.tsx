@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useStockStore } from '../../store/stockStore'
 import { getFinancial, getOhlcv, getPredict, getStockNews } from '../../api/stockApi'
-import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem } from '../../types/stock'
+import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem, Prediction } from '../../types/stock'
 
 interface Props {
   isPenny?: boolean
@@ -85,8 +85,8 @@ export default function StockDetailPanel({ isPenny = false }: Props) {
         )}
       </div>
 
-      {/* 스파크라인 차트 */}
-      {bars.length > 1 && <SparkChart bars={bars} />}
+      {/* 스파크라인 차트 + 예측 밴드 */}
+      {bars.length > 1 && <SparkChart bars={bars} prediction={prediction} />}
 
       {/* ── 동전주: 급등 가능성 점수 분석 (가격 기반 자동 판별 포함) ── */}
       {showPennyPanel && selectedStock ? (
@@ -339,30 +339,45 @@ function ScoreBar({ label, score, max, sub, color }: {
   )
 }
 
-// ── 스파크라인 차트 ────────────────────────────────────────────
-function SparkChart({ bars }: { bars: OhlcvBar[] }) {
-  const closes = bars.map(b => b.close)
-  const min = Math.min(...closes)
-  const max = Math.max(...closes)
-  const range = max - min || 1
+// ── 스파크라인 + 미래 예측 밴드 차트 ─────────────────────────────
+function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Prediction }) {
+  const closes   = bars.map(b => b.close)
+  const lastClose = closes[closes.length - 1]
 
-  const W = 400
-  const H = 72
+  // 스케일 계산: 예측값까지 포함해 Y축 범위 결정
+  const allValues = [...closes]
+  if (prediction) allValues.push(prediction.targetLow, prediction.targetHigh)
+  const minVal = Math.min(...allValues)
+  const maxVal = Math.max(...allValues)
+  const rangeVal = maxVal - minVal || 1
 
+  const W       = 400
+  const H       = 72
+  const SPLIT_X = 310   // 실제 구간 끝 / 예측 구간 시작
+
+  const toY = (v: number) => H - ((v - minVal) / rangeVal) * H * 0.85 - H * 0.075
+
+  // 실제 가격 경로
   const pts = closes.map((c, i) => ({
-    x: (i / (closes.length - 1)) * W,
-    y: H - ((c - min) / range) * H * 0.85 - H * 0.075,
+    x: (i / (closes.length - 1)) * SPLIT_X,
+    y: toY(c),
   }))
-
   let d = `M ${pts[0].x} ${pts[0].y}`
   for (let i = 1; i < pts.length; i++) {
     const mx = (pts[i - 1].x + pts[i].x) / 2
     d += ` C ${mx} ${pts[i - 1].y}, ${mx} ${pts[i].y}, ${pts[i].x} ${pts[i].y}`
   }
-
-  const areaD = d + ` L ${pts[pts.length - 1].x} ${H} L ${pts[0].x} ${H} Z`
-  const up    = closes[closes.length - 1] >= closes[0]
+  const areaD = d + ` L ${SPLIT_X} ${H} L ${pts[0].x} ${H} Z`
+  const up    = lastClose >= closes[0]
   const color = up ? '#00C896' : '#FF4B4B'
+
+  // 예측 좌표
+  const lastY        = toY(lastClose)
+  const predColor    = prediction?.direction === 'up'   ? '#00C896'
+                     : prediction?.direction === 'down' ? '#FF4B4B' : '#8892A8'
+  const highY        = prediction ? toY(prediction.targetHigh) : lastY
+  const lowY         = prediction ? toY(prediction.targetLow)  : lastY
+  const midY         = (highY + lowY) / 2
 
   return (
     <div style={{ margin: '0 -4px' }}>
@@ -372,10 +387,59 @@ function SparkChart({ bars }: { bars: OhlcvBar[] }) {
             <stop offset="0%" stopColor={color} stopOpacity="0.25" />
             <stop offset="100%" stopColor={color} stopOpacity="0" />
           </linearGradient>
+          <clipPath id="spark-actual">
+            <rect x="0" y="0" width={SPLIT_X} height={H} />
+          </clipPath>
         </defs>
-        <path d={areaD} fill="url(#sparkGrad)" />
-        <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+
+        {/* 실제 가격 영역 + 선 */}
+        <g clipPath="url(#spark-actual)">
+          <path d={areaD} fill="url(#sparkGrad)" />
+          <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+        </g>
+
+        {/* 예측 구간 */}
+        {prediction && (
+          <>
+            {/* 신뢰 밴드 */}
+            <path
+              d={`M ${SPLIT_X} ${highY} L ${W} ${highY - 3} L ${W} ${lowY + 3} L ${SPLIT_X} ${lowY} Z`}
+              fill={`${predColor}1A`}
+            />
+            {/* 상단 점선 */}
+            <line x1={SPLIT_X} y1={highY} x2={W} y2={highY - 3}
+              stroke={predColor} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.45" />
+            {/* 하단 점선 */}
+            <line x1={SPLIT_X} y1={lowY} x2={W} y2={lowY + 3}
+              stroke={predColor} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.45" />
+            {/* 중심 예측선 */}
+            <line x1={SPLIT_X} y1={lastY} x2={W} y2={midY}
+              stroke={predColor} strokeWidth="1.5" strokeDasharray="5,3" />
+          </>
+        )}
+
+        {/* 실제/예측 분기 수직선 */}
+        {prediction && (
+          <line x1={SPLIT_X} y1="4" x2={SPLIT_X} y2={H}
+            stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" strokeDasharray="3,3" />
+        )}
+
+        {/* 현재가 기준점 */}
+        <circle cx={SPLIT_X} cy={lastY} r="2.5" fill={color} />
       </svg>
+
+      {/* 하단 레이블 */}
+      {prediction && (
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          fontSize: 9, color: '#4B5675', padding: '2px 4px 0',
+        }}>
+          <span style={{ color: '#2A3148' }}>← 1개월 실제</span>
+          <span style={{ color: predColor, fontWeight: 600 }}>
+            {prediction.targetLow.toLocaleString()} ~ {prediction.targetHigh.toLocaleString()}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
