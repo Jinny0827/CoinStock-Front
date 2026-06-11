@@ -77,25 +77,26 @@ export default function AppHeader() {
         </div>
 
         {/* 검색바 */}
-        <div style={{ flex:1, display:'flex', justifyContent:'center' }}>
+        <div style={{ flex:1, minWidth:0, display:'flex', justifyContent:'center' }}>
           <div
             onClick={() => setSearchOpen(true)}
             style={{
-              width:340, height:32,
+              width:'100%', maxWidth:340, height:32,
               background:'rgba(255,255,255,0.04)',
               border:'1px solid rgba(255,255,255,0.07)',
               borderRadius:6, display:'flex', alignItems:'center',
-              padding:'0 12px', gap:8, cursor:'pointer',
+              padding:'0 10px', gap:7, cursor:'pointer', minWidth:0,
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4B5675" strokeWidth="2.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4B5675" strokeWidth="2.5" style={{ flexShrink:0 }}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <span style={{ fontSize:12, color:'#4B5675', flex:1 }}>종목, 테마, 키워드 검색</span>
+            <span style={{ fontSize:12, color:'#4B5675', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>종목, 테마, 키워드 검색</span>
             <span style={{
               fontSize:10, color:'#4B5675',
               background:'rgba(255,255,255,0.05)',
-              padding:'2px 6px', borderRadius:4,
+              padding:'2px 6px', borderRadius:4, flexShrink:0,
+              display:'var(--kbd-display,inline)',
             }}>⌘K</span>
           </div>
         </div>
@@ -140,7 +141,7 @@ export default function AppHeader() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width:480, background:'#111827',
+              width:'min(480px, calc(100vw - 24px))', background:'#111827',
               border:'1px solid rgba(255,255,255,0.1)',
               borderRadius:10, overflow:'hidden',
             }}

@@ -37,12 +37,12 @@ export default function HistoryPage() {
     const realized  = totalSell - totalBuy
 
     return (
-        <div style={{ padding: '24px 32px', maxWidth: 900, margin: '0 auto' }}>
+        <div style={{ padding: '16px', maxWidth: 900, margin: '0 auto' }}>
 
             {/* 헤더 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
                 <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>거래 기록</h2>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                     <input type="date" value={from} onChange={e => setFrom(e.target.value)}
                            style={dateInputStyle} />
                     <span style={{ color: '#4B5675', fontSize: 12 }}>~</span>
@@ -63,10 +63,12 @@ export default function HistoryPage() {
             </div>
 
             {/* 거래 목록 */}
+            <div style={{ overflowX: 'auto', borderRadius: 8 }}>
             <div style={{
                 background: '#0E1525',
                 border: '1px solid rgba(255,255,255,0.07)',
                 borderRadius: 8, overflow: 'hidden',
+                minWidth: 640,
             }}>
                 {/* 테이블 헤더 */}
                 <div style={{ ...rowStyle, background: 'rgba(255,255,255,0.03)', color: '#4B5675', fontSize: 11 }}>
@@ -116,6 +118,7 @@ export default function HistoryPage() {
                     ))
                 )}
             </div>
+            </div>
 
             {/* 거래 추가 모달 */}
             {showModal && (
@@ -161,7 +164,7 @@ function TradeModal({ onClose, onSubmit, loading }: {
         }} onClick={onClose}>
             <div style={{
                 background: '#0E1525', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10, padding: 24, width: 400,
+                borderRadius: 10, padding: 24, width: 'min(400px, calc(100vw - 24px))',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
             }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>거래 추가</div>
