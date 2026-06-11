@@ -1,7 +1,7 @@
 import client from './client'
 import type {
     StockQuote, FinancialData, OhlcvBar,
-    Prediction, FearGreed, FxRate,
+    Prediction, FearGreed, FxRate, MacroData,
     ForceStock, Trade, PortfolioSummary, WatchlistItem, StockNews,
 } from '../types/stock'
 
@@ -41,6 +41,9 @@ export const getIndices       = () =>
 
 export const getFxRate        = () =>
   client.get<FxRate & { code:string }>('/api/market/fx').then(r => r.data)
+
+export const getMacroData     = () =>
+  client.get<MacroData & { code:string }>('/api/market/macro').then(r => r.data)
 
 // ── 종목 상세 ──────────────────────────────────────────────
 export const getFinancial     = (symbol: string) =>

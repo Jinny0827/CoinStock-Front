@@ -21,13 +21,13 @@ export default function MyPage() {
     const pnlSign  = (v: number) => v >= 0 ? '+' : ''
 
     return (
-        <div style={{ padding: '24px 32px', maxWidth: 800, margin: '0 auto' }}>
+        <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
 
             {/* 헤더 */}
-            <h2 style={{ margin: '0 0 24px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
+            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
 
-            {/* 요약 카드 4개 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
+            {/* 요약 카드 4개 — 2열 고정 (모바일/데스크탑 모두) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 20 }}>
                 <StatCard
                     label="총 손익"
                     value={pnlSign(summary.totalPnl) + summary.totalPnl.toLocaleString()}
@@ -56,10 +56,12 @@ export default function MyPage() {
 
             {/* 종목별 현황 */}
             {summary.bySymbol.length > 0 && (
+                <div style={{ overflowX: 'auto', borderRadius: 8 }}>
                 <div style={{
                     background: '#0E1525',
                     border: '1px solid rgba(255,255,255,0.07)',
                     borderRadius: 8, overflow: 'hidden',
+                    minWidth: 520,
                 }}>
                     <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                         <span style={{ fontSize: 12, fontWeight: 600, color: '#8892A8' }}>종목별 현황</span>
@@ -108,6 +110,7 @@ export default function MyPage() {
                         </div>
                     ))}
                 </div>
+                </div>
             )}
         </div>
     )
@@ -141,8 +144,8 @@ function Loading() {
 
 function Empty() {
     return (
-        <div style={{ padding: '24px 32px', maxWidth: 800, margin: '0 auto' }}>
-            <h2 style={{ margin: '0 0 24px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
+        <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
             <div style={{
                 background: '#0E1525', border: '1px solid rgba(255,255,255,0.07)',
                 borderRadius: 8, padding: '60px 0', textAlign: 'center',

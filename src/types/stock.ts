@@ -79,6 +79,15 @@ export interface FxRate {
   updatedAt: number
 }
 
+/** /api/market/macro */
+export interface MacroData {
+  interestRate: number
+  vix:          number
+  wtiOil:       number
+  gold:         number
+  updatedAt:    number
+}
+
 /** /api/force */
 export type ForceStock = StockQuote
 

@@ -36,7 +36,7 @@ export default function WatchlistPage() {
     }
 
     return (
-        <div style={{ padding: '24px 32px', maxWidth: 700, margin: '0 auto' }}>
+        <div style={{ padding: '16px', maxWidth: 700, margin: '0 auto' }}>
 
             {/* 헤더 */}
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
@@ -137,7 +137,7 @@ function AddModal({ onClose, onSubmit, loading }: {
         }} onClick={onClose}>
             <div style={{
                 background: '#0E1525', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 10, padding: 24, width: 360,
+                borderRadius: 10, padding: 24, width: 'min(360px, calc(100vw - 24px))',
                 boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
             }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>관심 종목 추가</div>

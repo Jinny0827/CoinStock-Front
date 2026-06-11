@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useStockStore } from '../../store/stockStore'
 import { getFinancial, getOhlcv, getPredict, getStockNews } from '../../api/stockApi'
@@ -339,109 +340,328 @@ function ScoreBar({ label, score, max, sub, color }: {
   )
 }
 
-// ── 스파크라인 + 미래 예측 밴드 차트 ─────────────────────────────
+// ── 고도화 차트: 가격 + 거래량 + MA + 예측밴드 + 호버 툴팁 ────────
 function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Prediction }) {
-  const closes   = bars.map(b => b.close)
+  const [hov,      setHov]      = useState<{ idx: number; px: number; py: number } | null>(null)
+  const [predHov,  setPredHov]  = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  // ── 레이아웃 상수
+  const W = 560, PAD_L = 6, PAD_R = 50, PAD_T = 8
+  const HP = 150, HG = 4, HV = 34, HX = 16
+  const H  = HP + HG + HV + HX
+  const SP = PAD_L + (W - PAD_L - PAD_R) * 0.77   // actual | prediction 분기 X
+  const PE = W - PAD_R                              // prediction end X
+
+  const closes  = bars.map(b => b.close)
+  const ma5arr  = computeMA(closes, 5)
+  const ma20arr = computeMA(closes, 20)
+
+  const allVals = [...closes]
+  if (prediction) allVals.push(prediction.targetLow, prediction.targetHigh)
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals)
+  const rngV = maxV - minV || 1
+
+  const toX = (i: number) => PAD_L + (i / Math.max(bars.length - 1, 1)) * (SP - PAD_L)
+  const toY = (v: number) => PAD_T + (HP - PAD_T - 4) * (1 - (v - minV) / rngV)
+
+  const maxVol = Math.max(...bars.map(b => b.volume), 1)
+  const volTop = HP + HG
+  const barW   = Math.max(1, (SP - PAD_L) / bars.length * 0.7)
+
   const lastClose = closes[closes.length - 1]
+  const lastY     = toY(lastClose)
+  const priceUp   = lastClose >= closes[0]
+  const priceCol  = priceUp ? '#00C896' : '#FF4B4B'
+  const predCol   = prediction?.direction === 'up'   ? '#00C896'
+                  : prediction?.direction === 'down' ? '#FF4B4B' : '#8892A8'
 
-  // 스케일 계산: 예측값까지 포함해 Y축 범위 결정
-  const allValues = [...closes]
-  if (prediction) allValues.push(prediction.targetLow, prediction.targetHigh)
-  const minVal = Math.min(...allValues)
-  const maxVal = Math.max(...allValues)
-  const rangeVal = maxVal - minVal || 1
-
-  const W       = 400
-  const H       = 72
-  const SPLIT_X = 310   // 실제 구간 끝 / 예측 구간 시작
-
-  const toY = (v: number) => H - ((v - minVal) / rangeVal) * H * 0.85 - H * 0.075
-
-  // 실제 가격 경로
-  const pts = closes.map((c, i) => ({
-    x: (i / (closes.length - 1)) * SPLIT_X,
-    y: toY(c),
-  }))
-  let d = `M ${pts[0].x} ${pts[0].y}`
+  // ── 가격 경로 (cubic bezier)
+  const pts = closes.map((c, i) => ({ x: toX(i), y: toY(c) }))
+  let pricePth = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`
   for (let i = 1; i < pts.length; i++) {
-    const mx = (pts[i - 1].x + pts[i].x) / 2
-    d += ` C ${mx} ${pts[i - 1].y}, ${mx} ${pts[i].y}, ${pts[i].x} ${pts[i].y}`
+    const mx = (pts[i-1].x + pts[i].x) / 2
+    pricePth += ` C ${mx.toFixed(1)} ${pts[i-1].y.toFixed(1)},${mx.toFixed(1)} ${pts[i].y.toFixed(1)},${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)}`
   }
-  const areaD = d + ` L ${SPLIT_X} ${H} L ${pts[0].x} ${H} Z`
-  const up    = lastClose >= closes[0]
-  const color = up ? '#00C896' : '#FF4B4B'
+  const areaPth = pricePth + ` L ${SP.toFixed(1)} ${HP} L ${PAD_L} ${HP} Z`
 
-  // 예측 좌표
-  const lastY        = toY(lastClose)
-  const predColor    = prediction?.direction === 'up'   ? '#00C896'
-                     : prediction?.direction === 'down' ? '#FF4B4B' : '#8892A8'
-  const highY        = prediction ? toY(prediction.targetHigh) : lastY
-  const lowY         = prediction ? toY(prediction.targetLow)  : lastY
-  const midY         = (highY + lowY) / 2
+  // ── MA 경로 빌더 (closures: toX, toY)
+  const buildMA = (arr: (number | null)[]) => {
+    let d = '', px = 0, py = 0
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i]
+      if (v === null) continue
+      const x = toX(i), y = toY(v)
+      if (!d) { d = `M ${x.toFixed(1)} ${y.toFixed(1)}` }
+      else {
+        const mx = (px + x) / 2
+        d += ` C ${mx.toFixed(1)} ${py.toFixed(1)},${mx.toFixed(1)} ${y.toFixed(1)},${x.toFixed(1)} ${y.toFixed(1)}`
+      }
+      px = x; py = y
+    }
+    return d
+  }
+  const ma5Path  = buildMA(ma5arr)
+  const ma20Path = buildMA(ma20arr)
+
+  // ── Y축 눈금
+  const fmtY = (v: number) => {
+    if (v >= 1_000_000) return (v / 10_000).toFixed(0) + '만'
+    if (v >= 10_000)    return (v / 1_000).toFixed(0) + 'K'
+    if (v >= 1_000)     return (v / 1_000).toFixed(1) + 'K'
+    if (v >= 100)       return v.toFixed(0)
+    return v.toFixed(v < 10 ? 2 : 1)
+  }
+  const yTicks = [0, 0.33, 0.66, 1].map(r => ({ val: minV + rngV * r, y: toY(minV + rngV * r) }))
+
+  // ── X축 눈금 (약 5개)
+  const xStep  = Math.max(1, Math.floor(bars.length / 5))
+  const xTicks = bars
+    .map((b, i) => ({ i, b }))
+    .filter((_, i) => i % xStep === 0)
+    .map(({ i, b }) => {
+      const dt = new Date(b.timestamp * 1000)
+      return { i, label: `${dt.getMonth()+1}/${dt.getDate()}` }
+    })
+
+  // ── 예측 좌표
+  const predHighY = prediction ? toY(prediction.targetHigh) : lastY
+  const predLowY  = prediction ? toY(prediction.targetLow)  : lastY
+  const predMidY  = (predHighY + predLowY) / 2
+
+  // ── 마우스 핸들러
+  const onMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    const sr  = e.currentTarget.getBoundingClientRect()
+    const wr  = wrapRef.current?.getBoundingClientRect()
+    const svgX = ((e.clientX - sr.left) / sr.width) * W
+
+    if (svgX > SP) {
+      setPredHov(true); setHov(null); return
+    }
+    setPredHov(false)
+
+    let best = 0, minD = Infinity
+    for (let i = 0; i < bars.length; i++) {
+      const dist = Math.abs(toX(i) - svgX)
+      if (dist < minD) { minD = dist; best = i }
+    }
+    const px = wr ? e.clientX - wr.left : e.nativeEvent.offsetX
+    const py = wr ? e.clientY - wr.top  : e.nativeEvent.offsetY
+    setHov({ idx: best, px, py })
+  }
+  const onMouseLeave = () => { setHov(null); setPredHov(false) }
+
+  const hBar  = hov ? bars[hov.idx] : null
+  const wrapW = wrapRef.current?.offsetWidth ?? 300
 
   return (
-    <div style={{ margin: '0 -4px' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 72 }} preserveAspectRatio="none">
+    <div ref={wrapRef} style={{ position: 'relative', margin: '8px -4px 0', userSelect: 'none' }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width: '100%', height: 185, display: 'block' }}
+        preserveAspectRatio="none"
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      >
         <defs>
-          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          <linearGradient id="sg-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={priceCol} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={priceCol} stopOpacity="0"   />
           </linearGradient>
-          <clipPath id="spark-actual">
-            <rect x="0" y="0" width={SPLIT_X} height={H} />
+          <clipPath id="sg-clip">
+            <rect x={PAD_L} y={0} width={SP - PAD_L} height={HP} />
           </clipPath>
         </defs>
 
-        {/* 실제 가격 영역 + 선 */}
-        <g clipPath="url(#spark-actual)">
-          <path d={areaD} fill="url(#sparkGrad)" />
-          <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+        {/* Y축 그리드 + 레이블 */}
+        {yTicks.map((t, i) => (
+          <g key={i}>
+            <line x1={PAD_L} y1={t.y} x2={PE} y2={t.y}
+              stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+            <text x={PE + 3} y={t.y + 3.5} fontSize="8" fill="#3A4258" textAnchor="start">
+              {fmtY(t.val)}
+            </text>
+          </g>
+        ))}
+
+        {/* 가격 영역 + 선 + MA */}
+        <g clipPath="url(#sg-clip)">
+          <path d={areaPth} fill="url(#sg-grad)" />
+          <path d={pricePth} fill="none" stroke={priceCol} strokeWidth="1.5" />
+          {ma5Path  && <path d={ma5Path}  fill="none" stroke="#F0B429" strokeWidth="0.9" opacity="0.75" />}
+          {ma20Path && <path d={ma20Path} fill="none" stroke="#3D8EFF" strokeWidth="0.9" opacity="0.75" />}
         </g>
 
-        {/* 예측 구간 */}
+        {/* 예측 밴드 */}
         {prediction && (
-          <>
-            {/* 신뢰 밴드 */}
+          <g>
             <path
-              d={`M ${SPLIT_X} ${highY} L ${W} ${highY - 3} L ${W} ${lowY + 3} L ${SPLIT_X} ${lowY} Z`}
-              fill={`${predColor}1A`}
+              d={`M ${SP} ${predHighY} L ${PE} ${predHighY-3} L ${PE} ${predLowY+3} L ${SP} ${predLowY} Z`}
+              fill={`${predCol}18`}
             />
-            {/* 상단 점선 */}
-            <line x1={SPLIT_X} y1={highY} x2={W} y2={highY - 3}
-              stroke={predColor} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.45" />
-            {/* 하단 점선 */}
-            <line x1={SPLIT_X} y1={lowY} x2={W} y2={lowY + 3}
-              stroke={predColor} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.45" />
-            {/* 중심 예측선 */}
-            <line x1={SPLIT_X} y1={lastY} x2={W} y2={midY}
-              stroke={predColor} strokeWidth="1.5" strokeDasharray="5,3" />
-          </>
+            <line x1={SP} y1={predHighY} x2={PE} y2={predHighY-3}
+              stroke={predCol} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.5" />
+            <line x1={SP} y1={predLowY}  x2={PE} y2={predLowY+3}
+              stroke={predCol} strokeWidth="0.8" strokeDasharray="3,2" opacity="0.5" />
+            <line x1={SP} y1={lastY} x2={PE} y2={predMidY}
+              stroke={predCol} strokeWidth="1.5" strokeDasharray="5,3" />
+            <line x1={SP} y1={PAD_T/2} x2={SP} y2={HP}
+              stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" strokeDasharray="3,3" />
+          </g>
         )}
 
-        {/* 실제/예측 분기 수직선 */}
-        {prediction && (
-          <line x1={SPLIT_X} y1="4" x2={SPLIT_X} y2={H}
-            stroke="rgba(255,255,255,0.1)" strokeWidth="0.5" strokeDasharray="3,3" />
-        )}
+        {/* 거래량 막대 */}
+        {bars.map((b, i) => {
+          const bH   = (b.volume / maxVol) * HV
+          const bCol = i > 0 && b.close >= bars[i-1].close ? '#00C896' : '#FF4B4B'
+          return (
+            <rect key={i}
+              x={toX(i) - barW / 2} y={volTop + HV - bH}
+              width={barW} height={bH}
+              fill={bCol} opacity={hov?.idx === i ? 0.85 : 0.25}
+            />
+          )
+        })}
 
-        {/* 현재가 기준점 */}
-        <circle cx={SPLIT_X} cy={lastY} r="2.5" fill={color} />
+        {/* X축 레이블 */}
+        {xTicks.map(({ i, label }) => (
+          <text key={i} x={toX(i)} y={H - 1}
+            fontSize="8.5" fill="#3A4258" textAnchor="middle">
+            {label}
+          </text>
+        ))}
+
+        {/* 현재가 점 */}
+        <circle cx={SP} cy={lastY} r="2.5" fill={priceCol} />
+
+        {/* 호버 수직선 + 점 */}
+        {hov && hBar && (
+          <g>
+            <line x1={toX(hov.idx)} y1={PAD_T/2} x2={toX(hov.idx)} y2={HP}
+              stroke="rgba(255,255,255,0.18)" strokeWidth="0.8" />
+            <circle cx={toX(hov.idx)} cy={toY(hBar.close)} r="3"
+              fill={priceCol} stroke="rgba(0,0,0,0.6)" strokeWidth="1.2" />
+          </g>
+        )}
       </svg>
 
-      {/* 하단 레이블 */}
-      {prediction && (
+      {/* 가격 툴팁 (구름 효과) */}
+      {hov && hBar && (
         <div style={{
-          display: 'flex', justifyContent: 'space-between',
-          fontSize: 9, color: '#4B5675', padding: '2px 4px 0',
+          position:       'absolute',
+          top:            Math.max(4, hov.py - 110),
+          ...(hov.px < wrapW * 0.6
+            ? { left: hov.px + 12 }
+            : { right: wrapW - hov.px + 12 }),
+          background:     'rgba(10,16,30,0.92)',
+          border:         '1px solid rgba(255,255,255,0.1)',
+          borderRadius:   9,
+          padding:        '8px 11px',
+          fontSize:       10.5,
+          color:          '#C8D0E0',
+          pointerEvents:  'none',
+          zIndex:         20,
+          backdropFilter: 'blur(10px)',
+          boxShadow:      '0 4px 28px rgba(0,0,0,0.6)',
+          minWidth:       115,
+          lineHeight:     1.9,
         }}>
-          <span style={{ color: '#2A3148' }}>← 1개월 실제</span>
-          <span style={{ color: predColor, fontWeight: 600 }}>
-            {prediction.targetLow.toLocaleString()} ~ {prediction.targetHigh.toLocaleString()}
-          </span>
+          <div style={{ fontSize: 9, color: '#4B5675', marginBottom: 3 }}>
+            {new Date(hBar.timestamp * 1000).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+          </div>
+          {([
+            { label: '시', val: hBar.open,  col: '#C8D0E0' },
+            { label: '고', val: hBar.high,  col: '#00C896' },
+            { label: '저', val: hBar.low,   col: '#FF4B4B' },
+            { label: '종', val: hBar.close, col: priceCol  },
+          ] as { label: string; val: number; col: string }[]).map(({ label, val, col }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 14 }}>
+              <span style={{ color: '#4B5675' }}>{label}</span>
+              <span style={{ color: col, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                {val.toLocaleString()}
+              </span>
+            </div>
+          ))}
+          <div style={{
+            borderTop:  '1px solid rgba(255,255,255,0.06)',
+            marginTop:  4, paddingTop: 4,
+            color: '#4B5675', fontSize: 9,
+          }}>
+            거래량 {
+              hBar.volume >= 1_000_000 ? (hBar.volume/1_000_000).toFixed(1) + 'M' :
+              hBar.volume >= 1_000     ? (hBar.volume/1_000).toFixed(0) + 'K'     :
+              hBar.volume.toString()
+            }
+          </div>
         </div>
       )}
+
+      {/* 예측 툴팁 (구름 효과) */}
+      {predHov && prediction && (
+        <div style={{
+          position:       'absolute',
+          top:            4,
+          right:          4,
+          background:     'rgba(10,16,30,0.92)',
+          border:         `1px solid ${predCol}30`,
+          borderRadius:   9,
+          padding:        '8px 11px',
+          fontSize:       10.5,
+          color:          '#C8D0E0',
+          pointerEvents:  'none',
+          zIndex:         20,
+          backdropFilter: 'blur(10px)',
+          boxShadow:      `0 4px 28px rgba(0,0,0,0.6), 0 0 18px ${predCol}12`,
+          maxWidth:       158,
+          lineHeight:     1.85,
+        }}>
+          <div style={{ color: predCol, fontWeight: 700, fontSize: 11, marginBottom: 5 }}>
+            {prediction.direction === 'up'   ? '▲ 상승' :
+             prediction.direction === 'down' ? '▼ 하락' : '— 중립'} 예측
+          </div>
+          {([
+            { label: '상단 목표', val: prediction.targetHigh },
+            { label: '하단 목표', val: prediction.targetLow  },
+          ] as { label: string; val: number }[]).map(({ label, val }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <span style={{ color: '#4B5675' }}>{label}</span>
+              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{val.toLocaleString()}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <span style={{ color: '#4B5675' }}>신뢰도</span>
+            <span style={{ color: '#F0B429', fontWeight: 700 }}>{prediction.confidence}%</span>
+          </div>
+          <div style={{
+            borderTop:  '1px solid rgba(255,255,255,0.06)',
+            marginTop:  5, paddingTop: 5,
+            fontSize:   9, color: '#5A6478', lineHeight: 1.6,
+          }}>
+            {prediction.reason.slice(0, 90)}{prediction.reason.length > 90 ? '…' : ''}
+          </div>
+        </div>
+      )}
+
+      {/* 범례 */}
+      <div style={{
+        display: 'flex', gap: 10, padding: '3px 4px 0',
+        fontSize: 9, color: '#3A4258',
+      }}>
+        <span style={{ color: priceCol }}>● 종가</span>
+        <span style={{ color: '#F0B429' }}>— MA5</span>
+        <span style={{ color: '#3D8EFF' }}>— MA20</span>
+        {prediction && <span style={{ color: predCol }}>┄ AI 예측</span>}
+      </div>
     </div>
   )
+}
+
+function computeMA(closes: number[], period: number): (number | null)[] {
+  return closes.map((_, i) => {
+    if (i < period - 1) return null
+    const slice = closes.slice(i - period + 1, i + 1)
+    return slice.reduce((a, b) => a + b, 0) / period
+  })
 }
 
 // ── 공시 + 뉴스 섹션 ─────────────────────────────────────────

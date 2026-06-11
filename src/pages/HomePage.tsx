@@ -54,7 +54,7 @@ function MobileHome() {
     <div style={{
       minHeight: 'calc(100vh - 52px)',
       background: '#080C17',
-      paddingBottom: 80,
+      paddingBottom: 60,
     }}>
       <HotStockList />
       <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 0' }} />

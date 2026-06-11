@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getIndices, getFxRate, getFearGreed, getThemes } from '../../api/stockApi'
+import { getIndices, getFxRate, getFearGreed, getThemes, getMacroData } from '../../api/stockApi'
 
 export default function RightPanel() {
   const { data: indices = [] } = useQuery({
@@ -24,6 +24,12 @@ export default function RightPanel() {
     queryKey: ['themes'],
     queryFn: getThemes,
     staleTime: 60_000,
+  })
+
+  const { data: macro } = useQuery({
+    queryKey: ['macro'],
+    queryFn: getMacroData,
+    staleTime: 10 * 60_000,
   })
 
   const SYMBOL_LABEL: Record<string, string> = {
@@ -103,6 +109,47 @@ export default function RightPanel() {
           </>
         )}
       </div>
+
+      <Divider />
+
+      {/* 원자재 · 금리 */}
+      {macro && (
+        <div style={{ padding: '12px 16px' }}>
+          <SectionLabel>원자재 · 금리</SectionLabel>
+          {macro.updatedAt === 0 ? (
+            <div style={{ fontSize: 11, color: '#4B5675', padding: '8px 0' }}>
+              수집 중… (서버 시작 후 최대 10초)
+            </div>
+          ) : (
+            <>
+              <MacroRow
+                label="기준금리"
+                value={macro.interestRate.toFixed(2)}
+                unit="%"
+                dot={macro.interestRate >= 4 ? '#FF8C42' : '#00C896'}
+              />
+              <MacroRow
+                label="VIX"
+                value={macro.vix.toFixed(1)}
+                unit=""
+                dot={macro.vix >= 30 ? '#FF4B4B' : macro.vix >= 20 ? '#FF8C42' : '#00C896'}
+              />
+              <MacroRow
+                label="WTI"
+                value={'$' + macro.wtiOil.toFixed(1)}
+                unit="/배럴"
+                dot="#8892A8"
+              />
+              <MacroRow
+                label="금"
+                value={'$' + macro.gold.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                unit="/oz"
+                dot="#F0B429"
+              />
+            </>
+          )}
+        </div>
+      )}
 
       <Divider />
 
@@ -202,4 +249,29 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function Divider() {
   return <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
+}
+
+function MacroRow({ label, value, unit, dot }: {
+  label: string; value: string; unit: string; dot: string
+}) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '6px 0',
+      borderBottom: '1px solid rgba(255,255,255,0.03)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{
+          width: 5, height: 5, borderRadius: '50%',
+          background: dot, flexShrink: 0,
+          boxShadow: `0 0 4px ${dot}`,
+        }} />
+        <span style={{ fontSize: 11, color: '#8892A8' }}>{label}</span>
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+        {unit && <span style={{ fontSize: 9, color: '#4B5675', marginLeft: 2 }}>{unit}</span>}
+      </div>
+    </div>
+  )
 }
