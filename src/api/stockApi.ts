@@ -2,6 +2,7 @@ import client from './client'
 import type {
     StockQuote, FinancialData, OhlcvBar,
     Prediction, FearGreed, FxRate, MacroData,
+    EconomicPhase, ValueStock,
     ForceStock, Trade, PortfolioSummary, WatchlistItem, StockNews,
 } from '../types/stock'
 
@@ -44,6 +45,12 @@ export const getFxRate        = () =>
 
 export const getMacroData     = () =>
   client.get<MacroData & { code:string }>('/api/market/macro').then(r => r.data)
+
+export const getEconomicPhase = () =>
+  client.get<EconomicPhase & { code:string }>('/api/economy/phase').then(r => r.data)
+
+export const getValueScreener = () =>
+  client.get<{ code:string; data: ValueStock[]; total: number }>('/api/screener/value').then(r => r.data)
 
 // ── 종목 상세 ──────────────────────────────────────────────
 export const getFinancial     = (symbol: string) =>

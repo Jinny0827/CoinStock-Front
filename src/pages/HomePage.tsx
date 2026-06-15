@@ -49,27 +49,37 @@ function DesktopHome() {
 
 // ── 모바일 ────────────────────────────────────────────────
 function MobileHome() {
-  const selectedStock = useStockStore(s => s.selectedStock)
-  return (
-    <div style={{
-      minHeight: 'calc(100vh - 52px)',
-      background: '#080C17',
-      paddingBottom: 60,
-    }}>
-      <HotStockList />
-      <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', margin: '12px 0' }} />
-      {selectedStock ? (
-        <StockDetailPanel />
-      ) : (
-        <div style={{
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          padding: '40px 20px', gap: 10,
-        }}>
-          <div style={{ fontSize: 22, opacity: 0.3 }}>📊</div>
-          <div style={{ fontSize: 12, color: '#4B5675' }}>종목을 선택해주세요</div>
+  const selectedStock    = useStockStore(s => s.selectedStock)
+  const setSelectedStock = useStockStore(s => s.setSelectedStock)
+
+  // 종목 선택 시: 리스트 숨기고 디테일 뷰로 전환
+  if (selectedStock) {
+    return (
+      <div style={{ height: 'calc(100vh - 52px)', background: '#080C17', display: 'flex', flexDirection: 'column' }}>
+        {/* 뒤로가기 */}
+        <div
+          onClick={() => setSelectedStock(null)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '10px 16px',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            cursor: 'pointer', flexShrink: 0,
+          }}
+        >
+          <span style={{ fontSize: 16, color: '#4B5675' }}>←</span>
+          <span style={{ fontSize: 12, color: '#4B5675' }}>종목 목록</span>
         </div>
-      )}
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <StockDetailPanel />
+        </div>
+      </div>
+    )
+  }
+
+  // 종목 미선택 시: 리스트 전체 화면
+  return (
+    <div style={{ height: 'calc(100vh - 52px)', background: '#080C17', display: 'flex', flexDirection: 'column' }}>
+      <HotStockList />
     </div>
   )
 }

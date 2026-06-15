@@ -10,7 +10,7 @@ export default function AppHeader() {
   const [query,      setQuery]        = useState('')
   const inputRef                      = useRef<HTMLInputElement>(null)
   const navigate                      = useNavigate()
-  const { setSelectedSymbol }         = useStockStore()
+  const { setSelectedSymbol, setSelectedStock } = useStockStore()
 
   // 검색창 열릴 때만 전체 종목 로드
   const { data: allStocks = [] } = useQuery({
@@ -30,8 +30,9 @@ export default function AppHeader() {
         )
         .slice(0, 8)
 
-  function select(symbol: string) {
-    setSelectedSymbol(symbol)
+  function select(stock: StockQuote) {
+    setSelectedSymbol(stock.symbol)
+    setSelectedStock(stock)
     setSearchOpen(false)
     setQuery('')
     navigate('/')
@@ -194,7 +195,7 @@ export default function AppHeader() {
                     key={stock.symbol}
                     stock={stock}
                     query={query}
-                    onSelect={() => select(stock.symbol)}
+                    onSelect={() => select(stock)}
                   />
                 ))
               )}

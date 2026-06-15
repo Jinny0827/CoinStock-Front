@@ -44,8 +44,7 @@ export default function HotStockList() {
     '미장':     usData,
   }
 
-  // 국장/미장 동전주: 서버에서 score 순으로 이미 정렬돼 있으므로 순서 유지
-  // 세력감지: 등락률 절댓값 내림차순
+  // 세력감지: 등락률 절댓값 내림차순 / 국장·미장: 서버 score 순 유지
   const list = (tab === '세력감지'
     ? listMap['세력감지'].slice().sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
     : listMap[tab].slice()

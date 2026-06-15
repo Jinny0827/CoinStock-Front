@@ -50,7 +50,9 @@ export interface Prediction {
   targetLow:    number
   targetHigh:   number
   confidence:   number
-  reason:       string
+  reason:             string
+  detail?:            string
+  companyDescription?: string
   indicators: {
     ma5:      number
     ma20:     number
@@ -77,6 +79,29 @@ export interface FxRate {
   usdKrw:    number
   jpyKrw:    number
   updatedAt: number
+}
+
+/** /api/economy/phase */
+export interface EconomicPhase {
+  phase:        'EXPANSION' | 'PEAK' | 'CONTRACTION' | 'RECOVERY'
+  label:        string
+  description:  string
+  interestRate: number
+  vix:          number
+  wtiOil:       number
+  gold:         number
+  updatedAt:    number
+}
+
+/** /api/screener/value */
+export interface ValueStock {
+  symbol:          string
+  name:            string
+  eps:             number
+  per:             number
+  pbr:             number
+  revenueGrowth:   number
+  operatingMargin: number
 }
 
 /** /api/market/macro */

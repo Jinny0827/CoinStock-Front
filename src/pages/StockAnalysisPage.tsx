@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useLocation } from 'react-router-dom'
 import {
   getKrPennyStocks, getUsPennyStocks,
   getKrMainStocks, getUsMainStocks,
 } from '../api/stockApi'
-import { useStockStore } from '../store/stockStore'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import StockDetailPanel from '../components/home/StockDetailPanel'
 import type { StockQuote } from '../types/stock'
@@ -47,7 +47,11 @@ export default function StockAnalysisPage() {
   const [search,    setSearch]    = useState('')
 
   const isDesktop = useIsDesktop()
-  const { selectedSymbol, setSelectedSymbol, setSelectedStock } = useStockStore()
+  const location  = useLocation()
+  const [analysisSymbol, setAnalysisSymbol] = useState<string>(
+    (location.state as { symbol?: string } | null)?.symbol ?? '005930.KS'
+  )
+  const [analysisStock, setAnalysisStock] = useState<StockQuote | null>(null)
   const [mobileShowDetail, setMobileShowDetail] = useState(false)
 
   // ── 데이터 쿼리 ────────────────────────────────────────────
@@ -122,8 +126,8 @@ export default function StockAnalysisPage() {
   }, [rawData, search, isPenny, mainSort, pennySort])
 
   const handleSelect = (stock: StockQuote) => {
-    setSelectedSymbol(stock.symbol)
-    setSelectedStock(stock)
+    setAnalysisSymbol(stock.symbol)
+    setAnalysisStock(stock)
     if (!isDesktop) setMobileShowDetail(true)
   }
 
@@ -133,7 +137,7 @@ export default function StockAnalysisPage() {
   }
 
   // ── 모바일: 상세 화면 ──────────────────────────────────────
-  if (!isDesktop && mobileShowDetail && selectedSymbol) {
+  if (!isDesktop && mobileShowDetail && analysisSymbol) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#080C17' }}>
         <div style={{
@@ -291,7 +295,7 @@ export default function StockAnalysisPage() {
               stock={stock}
               isKr={isKr}
               isPenny={isPenny}
-              selected={selectedSymbol === stock.symbol}
+              selected={analysisSymbol === stock.symbol}
               onClick={() => handleSelect(stock)}
             />
           ))
@@ -322,8 +326,8 @@ export default function StockAnalysisPage() {
           {listPanel}
         </div>
         <div style={{ flex: 1, overflow: 'hidden', background: '#080C17' }}>
-          {selectedSymbol ? (
-            <StockDetailPanel isPenny={isPenny} />
+          {analysisSymbol ? (
+            <StockDetailPanel isPenny={isPenny} symbol={analysisSymbol} stock={analysisStock} />
           ) : (
             <div style={{
               display: 'flex', flexDirection: 'column',

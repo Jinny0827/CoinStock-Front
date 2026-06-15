@@ -9,6 +9,8 @@ import StockAnalysisPage from './pages/StockAnalysisPage'
 import HistoryPage from './pages/HistoryPage'
 import WatchlistPage from './pages/WatchlistPage.tsx'
 import MyPage from './pages/MyPage'
+import EconomicPhasePage from './pages/EconomicPhasePage'
+import ScreenerPage from './pages/ScreenerPage'
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -42,11 +44,13 @@ function Layout() {
                 paddingBottom: isDesktop ? 0 : 60,
             }}>
                 <Routes>
-                    <Route path="/"          element={<HomePage />} />
-                    <Route path="/analysis"  element={<StockAnalysisPage />} />
-                    <Route path="/history"   element={<HistoryPage />} />
-                    <Route path="/watchlist" element={<WatchlistPage />} />
-                    <Route path="/mypage"    element={<MyPage />} />
+                    <Route path="/"           element={<HomePage />} />
+                    <Route path="/analysis"   element={<StockAnalysisPage />} />
+                    <Route path="/history"    element={<HistoryPage />} />
+                    <Route path="/watchlist"  element={<WatchlistPage />} />
+                    <Route path="/mypage"     element={<MyPage />} />
+                    <Route path="/economic"   element={<EconomicPhasePage />} />
+                    <Route path="/screener"   element={<ScreenerPage />} />
                 </Routes>
             </div>
             {!isDesktop && <BottomNav />}

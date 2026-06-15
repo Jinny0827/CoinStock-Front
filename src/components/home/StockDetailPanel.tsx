@@ -6,11 +6,16 @@ import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem, Prediction } from 
 
 interface Props {
   isPenny?: boolean
+  symbol?:  string
+  stock?:   StockQuote | null
 }
 
-export default function StockDetailPanel({ isPenny = false }: Props) {
-  const symbol        = useStockStore(s => s.selectedSymbol)
-  const selectedStock = useStockStore(s => s.selectedStock)
+export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, stock: propStock }: Props) {
+  const storeSymbol = useStockStore(s => s.selectedSymbol)
+  const storeStock  = useStockStore(s => s.selectedStock)
+  const symbol        = propSymbol ?? storeSymbol
+  const selectedStock = propStock !== undefined ? propStock : storeStock
+  const [detailOpen, setDetailOpen] = useState(false)
 
   // 가격 기반 동전주 자동 판별 — isPenny prop 없이도 세력감지 탭 등에서 동작
   const isKrSymbol    = symbol.endsWith('.KS') || symbol.endsWith('.KQ')
@@ -38,7 +43,7 @@ export default function StockDetailPanel({ isPenny = false }: Props) {
   const { data: prediction } = useQuery({
     queryKey: ['predict', symbol],
     queryFn:  () => getPredict(symbol),
-    staleTime: 10 * 60_000,
+    staleTime: 24 * 60 * 60_000,
     enabled: !!symbol,
   })
 
@@ -85,6 +90,28 @@ export default function StockDetailPanel({ isPenny = false }: Props) {
           </div>
         )}
       </div>
+
+      {/* 회사 소개 */}
+      {prediction?.companyDescription && (
+        <div style={{
+          marginBottom: 14,
+          background: 'linear-gradient(135deg, rgba(61,142,255,0.06) 0%, rgba(0,200,150,0.04) 100%)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderLeft: '3px solid #3D8EFF',
+          borderRadius: 8, padding: '10px 14px',
+          display: 'flex', gap: 10, alignItems: 'flex-start',
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>🏢</span>
+          <div>
+            <div style={{ fontSize: 10, color: '#3D8EFF', fontWeight: 700, marginBottom: 4, letterSpacing: 0.5 }}>
+              회사 소개
+            </div>
+            <div style={{ fontSize: 12, color: '#C9D1E0', lineHeight: 1.7 }}>
+              {prediction.companyDescription}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 스파크라인 차트 + 예측 밴드 */}
       {bars.length > 1 && <SparkChart bars={bars} prediction={prediction} />}
@@ -136,9 +163,64 @@ export default function StockDetailPanel({ isPenny = false }: Props) {
             </span>
           </div>
 
-          <div style={{ fontSize: 11.5, lineHeight: 1.65, color: '#8892A8', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, lineHeight: 1.7, color: '#C9D1E0', marginBottom: 10 }}>
             {prediction.reason}
+            {prediction.detail && (
+              <span
+                onClick={() => setDetailOpen(true)}
+                style={{
+                  marginLeft: 8, fontSize: 10, color: '#3D8EFF',
+                  cursor: 'pointer', textDecoration: 'underline', whiteSpace: 'nowrap',
+                }}
+              >자세히 보기</span>
+            )}
           </div>
+
+          {/* 상세 분석 모달 */}
+          {detailOpen && prediction.detail && (
+            <div
+              onClick={() => setDetailOpen(false)}
+              style={{
+                position: 'fixed', inset: 0,
+                background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                zIndex: 2000,
+              }}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: '#111827',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 12, padding: 24,
+                  width: 'min(480px, calc(100vw - 32px))',
+                  boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 700,
+                    background: 'rgba(240,180,41,0.12)', color: '#F0B429',
+                    padding: '2px 6px', borderRadius: 3,
+                  }}>AI 예측</span>
+                  <span style={{ fontSize: 13, fontWeight: 700 }}>상세 분석</span>
+                  <button
+                    onClick={() => setDetailOpen(false)}
+                    style={{
+                      marginLeft: 'auto', background: 'none', border: 'none',
+                      color: '#4B5675', fontSize: 18, cursor: 'pointer', lineHeight: 1,
+                    }}
+                  >×</button>
+                </div>
+                <p style={{
+                  fontSize: 13, lineHeight: 1.8, color: '#C9D1E0',
+                  margin: 0,
+                }}>
+                  {prediction.detail}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* 신뢰도 바 */}
           <div style={{ fontSize: 10, color: '#4B5675', display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
