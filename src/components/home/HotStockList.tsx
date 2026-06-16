@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {addWatchlist, deleteWatchlist, getForceStocks, getKrPennyStocks, getUsPennyStocks, isWatched} from '../../api/stockApi'
 import { useStockStore } from '../../store/stockStore'
@@ -7,6 +7,9 @@ import type { StockQuote } from '../../types/stock'
 type TabType = '세력감지' | '국장' | '미장'
 
 const TABS: TabType[] = ['세력감지', '국장', '미장']
+
+const dedup = <T extends { symbol: string }>(data: T[]): T[] =>
+  [...new Map(data.map(s => [s.symbol, s])).values()]
 
 const THEME_MAP: Record<string, string> = {
   '005930.KS': '반도체', '000660.KS': '반도체', '035420.KS': 'IT',
@@ -17,11 +20,20 @@ const THEME_MAP: Record<string, string> = {
 export default function HotStockList() {
   const [tab, setTab] = useState<TabType>('세력감지')
   const { selectedSymbol, setSelectedSymbol, setSelectedStock } = useStockStore()
+  const qc = useQueryClient()
+
+  const handleTabChange = useCallback((newTab: TabType) => {
+    // 비활성 탭의 캐시를 제거해 스테일 데이터가 다른 탭에 섞이지 않도록 방지
+    if (newTab !== '국장') qc.removeQueries({ queryKey: ['penny-kr'] })
+    if (newTab !== '미장') qc.removeQueries({ queryKey: ['penny-us'] })
+    setTab(newTab)
+  }, [qc])
 
   const { data: forceData = [] } = useQuery({
     queryKey: ['force'],
     queryFn: getForceStocks,
     refetchInterval: 10_000,
+    select: dedup,
   })
 
   const { data: krData = [], isLoading: krLoading } = useQuery({
@@ -29,6 +41,7 @@ export default function HotStockList() {
     queryFn: getKrPennyStocks,
     enabled: tab === '국장',
     refetchInterval: 30_000,
+    select: dedup,
   })
 
   const { data: usData = [], isLoading: usLoading } = useQuery({
@@ -36,6 +49,7 @@ export default function HotStockList() {
     queryFn: getUsPennyStocks,
     enabled: tab === '미장',
     refetchInterval: 30_000,
+    select: dedup,
   })
 
   const listMap: Record<TabType, StockQuote[]> = {
@@ -89,7 +103,7 @@ export default function HotStockList() {
         flexShrink: 0,
       }}>
         {TABS.map(t => (
-          <div key={t} onClick={() => setTab(t)} style={{
+          <div key={t} onClick={() => handleTabChange(t)} style={{
             padding: '9px 14px', fontSize: 12, fontWeight: 500,
             cursor: 'pointer',
             color: tab === t ? '#00C896' : '#4B5675',

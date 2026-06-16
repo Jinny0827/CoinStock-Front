@@ -9,6 +9,9 @@ import { useIsDesktop } from '../hooks/useIsDesktop'
 import StockDetailPanel from '../components/home/StockDetailPanel'
 import type { StockQuote } from '../types/stock'
 
+const dedup = <T extends { symbol: string }>(data: T[]): T[] =>
+  [...new Map(data.map(s => [s.symbol, s])).values()]
+
 // ── 탭 ──────────────────────────────────────────────────────
 type TabKey = 'kr-main' | 'us-main' | 'kr-penny' | 'us-penny'
 
@@ -60,26 +63,30 @@ export default function StockAnalysisPage() {
     queryFn:  getKrMainStocks,
     staleTime: 60_000,
     enabled: tab === 'kr-main',
+    select: dedup,
   })
   const { data: usMain  = [], isFetching: usMainFetching,  refetch: usMainRefetch  } = useQuery({
     queryKey: ['us-main'],
     queryFn:  getUsMainStocks,
     staleTime: 60_000,
     enabled: tab === 'us-main',
+    select: dedup,
   })
   const { data: krPenny = [], isFetching: krPennyFetching, refetch: krPennyRefetch } = useQuery({
     queryKey: ['analysis-kr'],
     queryFn:  getKrPennyStocks,
     staleTime: 15 * 60_000,
-    refetchOnMount: true,
+    enabled: tab === 'kr-penny',
     refetchOnWindowFocus: false,
+    select: dedup,
   })
   const { data: usPenny = [], isFetching: usPennyFetching, refetch: usPennyRefetch } = useQuery({
     queryKey: ['analysis-us'],
     queryFn:  getUsPennyStocks,
     staleTime: 15 * 60_000,
-    refetchOnMount: true,
+    enabled: tab === 'us-penny',
     refetchOnWindowFocus: false,
+    select: dedup,
   })
 
   // ── 현재 탭 메타 ───────────────────────────────────────────
