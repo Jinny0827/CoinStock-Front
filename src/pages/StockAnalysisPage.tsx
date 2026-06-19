@@ -18,8 +18,8 @@ type TabKey = 'kr-main' | 'us-main' | 'kr-penny' | 'us-penny'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'kr-main',   label: 'KR 주요' },
   { key: 'us-main',   label: 'US 주요' },
-  { key: 'kr-penny',  label: '국장 동전주' },
-  { key: 'us-penny',  label: '미장 동전주' },
+  { key: 'kr-penny',  label: '국장 동전주 도파민' },
+  { key: 'us-penny',  label: '미장 동전주 도파민' },
 ]
 
 // 주요 탭 정렬
@@ -48,6 +48,7 @@ export default function StockAnalysisPage() {
   const [mainSort,  setMainSort]  = useState<MainSortKey>('marketCap')
   const [pennySort, setPennySort] = useState<PennySortKey>('score')
   const [search,    setSearch]    = useState('')
+  const [dirFilter, setDirFilter] = useState<'all' | 'up' | 'down'>('all')
 
   const isDesktop = useIsDesktop()
   const location  = useLocation()
@@ -101,19 +102,24 @@ export default function StockAnalysisPage() {
   }
   const { data: rawData, fetching, refetch } = tabMeta[tab]
 
-  // ── 검색 + 정렬 + 100개 제한 ───────────────────────────────
+  // ── 검색 + 필터 + 정렬 + 100개 제한 ─────────────────────────
   const displayList = useMemo(() => {
     const q = search.trim().toLowerCase()
 
     // 1. 검색 필터
-    const filtered = q
+    const searched = q
       ? rawData.filter(s =>
           s.symbol.toLowerCase().includes(q) ||
           (s.name || '').toLowerCase().includes(q)
         )
       : rawData
 
-    // 2. 정렬
+    // 2. 상승/하락 필터
+    const filtered = dirFilter === 'up'   ? searched.filter(s => s.changePercent > 0)
+                   : dirFilter === 'down' ? searched.filter(s => s.changePercent < 0)
+                   : searched
+
+    // 3. 정렬
     const sorted = [...filtered].sort((a, b) => {
       if (isPenny) {
         if (pennySort === 'score')         return (b.score ?? 0) - (a.score ?? 0)
@@ -130,7 +136,7 @@ export default function StockAnalysisPage() {
 
     // 3. 100개 제한 (검색 없을 때만)
     return q ? sorted : sorted.slice(0, PENNY_LIMIT)
-  }, [rawData, search, isPenny, mainSort, pennySort])
+  }, [rawData, search, isPenny, mainSort, pennySort, dirFilter])
 
   const handleSelect = (stock: StockQuote) => {
     setAnalysisSymbol(stock.symbol)
@@ -140,7 +146,8 @@ export default function StockAnalysisPage() {
 
   const handleTabChange = (t: TabKey) => {
     setTab(t)
-    setSearch('')   // 탭 전환 시 검색 초기화
+    setSearch('')
+    setDirFilter('all')
   }
 
   // ── 모바일: 상세 화면 ──────────────────────────────────────
@@ -190,9 +197,9 @@ export default function StockAnalysisPage() {
             onClick={() => refetch()}
             disabled={fetching}
             style={{
-              background: 'rgba(0,200,150,0.08)',
-              border: `1px solid rgba(0,200,150,${fetching ? '0.1' : '0.25'})`,
-              color: fetching ? '#4B5675' : '#00C896',
+              background: 'rgba(255,140,0,0.08)',
+              border: `1px solid rgba(255,140,0,${fetching ? '0.1' : '0.25'})`,
+              color: fetching ? '#4B5675' : '#FF8C00',
               borderRadius: 5, fontSize: 11, padding: '4px 10px',
               cursor: fetching ? 'default' : 'pointer',
             }}
@@ -205,8 +212,8 @@ export default function StockAnalysisPage() {
             <button key={t.key} onClick={() => handleTabChange(t.key)} style={{
               padding: '5px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
               border: 'none', whiteSpace: 'nowrap', background: 'transparent',
-              borderBottom: `2px solid ${tab === t.key ? '#00C896' : 'transparent'}`,
-              color: tab === t.key ? '#00C896' : '#4B5675', transition: 'color 0.12s',
+              borderBottom: `2px solid ${tab === t.key ? '#FF8C00' : 'transparent'}`,
+              color: tab === t.key ? '#FF8C00' : '#4B5675', transition: 'color 0.12s',
             }}>
               {t.label}
               {(t.key === 'kr-penny' && krPenny.length > 0) && (
@@ -232,7 +239,7 @@ export default function StockAnalysisPage() {
             style={{
               width: '100%', boxSizing: 'border-box',
               background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${search ? 'rgba(0,200,150,0.3)' : 'rgba(255,255,255,0.08)'}`,
+              border: `1px solid ${search ? 'rgba(255,140,0,0.3)' : 'rgba(255,255,255,0.08)'}`,
               borderRadius: 6, padding: '6px 10px 6px 30px',
               color: '#E2E8F0', fontSize: 12, outline: 'none',
             }}
@@ -249,12 +256,10 @@ export default function StockAnalysisPage() {
           )}
         </div>
 
-        {/* 정렬 버튼 */}
-        <div style={{ display: 'flex', gap: 5 }}>
+        {/* 정렬 버튼 + 상승/하락 필터 */}
+        <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
           {(isPenny ? PENNY_SORT_OPTIONS : MAIN_SORT_OPTIONS).map(opt => {
-            const isActive = isPenny
-              ? pennySort === opt.key
-              : mainSort === opt.key
+            const isActive = isPenny ? pennySort === opt.key : mainSort === opt.key
             return (
               <button
                 key={opt.key}
@@ -264,13 +269,26 @@ export default function StockAnalysisPage() {
                 }
                 style={{
                   fontSize: 10, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
-                  border: `1px solid ${isActive ? 'rgba(0,200,150,0.4)' : 'rgba(255,255,255,0.07)'}`,
-                  background: isActive ? 'rgba(0,200,150,0.08)' : 'transparent',
-                  color: isActive ? '#00C896' : '#4B5675',
+                  border: `1px solid ${isActive ? 'rgba(255,140,0,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                  background: isActive ? 'rgba(255,140,0,0.08)' : 'transparent',
+                  color: isActive ? '#FF8C00' : '#4B5675',
                 }}
               >{opt.label}</button>
             )
           })}
+          <span style={{ marginLeft: 'auto' }} />
+          {(['all', 'up', 'down'] as const).map(d => (
+            <button
+              key={d}
+              onClick={() => setDirFilter(d)}
+              style={{
+                fontSize: 10, padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
+                border: `1px solid ${dirFilter === d ? (d === 'up' ? 'rgba(255,140,0,0.4)' : d === 'down' ? 'rgba(100,160,255,0.4)' : 'rgba(255,255,255,0.15)') : 'rgba(255,255,255,0.07)'}`,
+                background: dirFilter === d ? (d === 'up' ? 'rgba(255,140,0,0.08)' : d === 'down' ? 'rgba(100,160,255,0.08)' : 'rgba(255,255,255,0.05)') : 'transparent',
+                color: dirFilter === d ? (d === 'up' ? '#FF8C00' : d === 'down' ? '#64A0FF' : '#A0AEC0') : '#4B5675',
+              }}
+            >{ d === 'all' ? '전체' : d === 'up' ? '상승' : '하락' }</button>
+          ))}
         </div>
       </div>
 
@@ -363,8 +381,8 @@ function TabBadge({ count, active }: { count: number; active: boolean }) {
   return (
     <span style={{
       marginLeft: 4, fontSize: 9,
-      background: active ? 'rgba(0,200,150,0.15)' : 'rgba(255,255,255,0.06)',
-      color: active ? '#00C896' : '#4B5675',
+      background: active ? 'rgba(255,140,0,0.15)' : 'rgba(255,255,255,0.06)',
+      color: active ? '#FF8C00' : '#4B5675',
       padding: '1px 4px', borderRadius: 3, fontWeight: 700,
     }}>{count}</span>
   )
@@ -415,9 +433,9 @@ function AnalysisRow({
         display: 'grid',
         gridTemplateColumns: isPenny ? '28px 1fr 88px 60px 50px' : '28px 1fr 100px 65px',
         padding: '9px 16px', alignItems: 'center', cursor: 'pointer',
-        background: selected ? 'rgba(0,200,150,0.06)' : 'transparent',
+        background: selected ? 'rgba(255,140,0,0.06)' : 'transparent',
         borderBottom: '1px solid rgba(255,255,255,0.03)',
-        borderLeft: selected ? '2px solid #00C896' : '2px solid transparent',
+        borderLeft: selected ? '2px solid #FF8C00' : '2px solid transparent',
         transition: 'background 0.1s',
       }}
       onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }}
@@ -454,7 +472,7 @@ function AnalysisRow({
       {/* 등락률 */}
       <div style={{
         textAlign: 'right', fontSize: 11, fontWeight: 700,
-        color: up ? '#00C896' : '#FF4B4B',
+        color: up ? '#FF8C00' : '#FF4B4B',
         fontVariantNumeric: 'tabular-nums',
       }}>
         {up ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(1)}%
@@ -466,8 +484,8 @@ function AnalysisRow({
           {stock.score != null && stock.score > 0 ? (
             <span style={{
               fontSize: 10, fontWeight: 700, padding: '2px 5px', borderRadius: 3,
-              background: stock.score >= 70 ? 'rgba(0,200,150,0.15)' : 'rgba(61,142,255,0.1)',
-              color: stock.score >= 70 ? '#00C896' : '#3D8EFF',
+              background: stock.score >= 70 ? 'rgba(255,140,0,0.15)' : 'rgba(61,142,255,0.1)',
+              color: stock.score >= 70 ? '#FF8C00' : '#3D8EFF',
             }}>{stock.score}</span>
           ) : (
             <span style={{ fontSize: 10, color: '#2A3148' }}>-</span>
@@ -524,7 +542,7 @@ function LoadingSpinner() {
       <div style={{
         width: 20, height: 20, borderRadius: '50%',
         border: '2px solid rgba(255,255,255,0.06)',
-        borderTopColor: '#00C896',
+        borderTopColor: '#FF8C00',
         animation: 'spin 0.7s linear infinite',
       }} />
       <div style={{ fontSize: 11, color: '#4B5675' }}>불러오는 중…</div>

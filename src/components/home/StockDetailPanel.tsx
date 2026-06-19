@@ -1,13 +1,62 @@
 import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useStockStore } from '../../store/stockStore'
-import { getFinancial, getOhlcv, getPredict, getStockNews } from '../../api/stockApi'
-import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem, Prediction } from '../../types/stock'
+import { getFinancial, getOhlcv, getPredict, getPredictHistory, getStockNews } from '../../api/stockApi'
+import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem, Prediction, PredictionHistoryItem } from '../../types/stock'
 
 interface Props {
   isPenny?: boolean
   symbol?:  string
   stock?:   StockQuote | null
+}
+
+function IndicatorBadge({ label, tip }: { label: string; tip: string }) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLSpanElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setPos({ x: r.left + r.width / 2, y: r.top })
+  }
+
+  return (
+    <span style={{ display: 'inline-block' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setPos(null)}
+    >
+      <span style={{
+        fontSize: 10, color: '#4B5675',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        padding: '2px 7px', borderRadius: 4,
+        cursor: 'default',
+      }}>{label}</span>
+      {pos && (
+        <div style={{
+          position: 'fixed',
+          left: pos.x, top: pos.y - 8,
+          transform: 'translate(-50%, -100%)',
+          zIndex: 9999,
+          background: '#1E2540',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 6, padding: '7px 10px',
+          fontSize: 11, color: '#C8D0E0',
+          whiteSpace: 'pre', lineHeight: 1.6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+          pointerEvents: 'none',
+        }}>
+          {tip}
+          <div style={{
+            position: 'absolute', top: '100%', left: '50%',
+            transform: 'translateX(-50%)',
+            width: 0, height: 0,
+            borderLeft: '5px solid transparent',
+            borderRight: '5px solid transparent',
+            borderTop: '5px solid #1E2540',
+          }} />
+        </div>
+      )}
+    </span>
+  )
 }
 
 export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, stock: propStock }: Props) {
@@ -47,10 +96,17 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
     enabled: !!symbol,
   })
 
+  const { data: predictHistory = [] } = useQuery({
+    queryKey: ['predict-history', symbol],
+    queryFn:  () => getPredictHistory(symbol),
+    staleTime: 60 * 60_000,
+    enabled: !!symbol,
+  })
+
   const { data: stockNews } = useQuery({
     queryKey: ['news', symbol],
     queryFn:  () => getStockNews(symbol),
-    staleTime: 15 * 60_000,   // 15분 — NewsCache TTL과 동일
+    staleTime: 15 * 60_000,
     enabled: !!symbol,
   })
 
@@ -79,12 +135,12 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <div style={{
               fontSize: 28, fontWeight: 800,
-              color: '#00C896', letterSpacing: '-1px',
+              color: '#FF8C00', letterSpacing: '-1px',
               fontVariantNumeric: 'tabular-nums',
             }}>
               {currentPrice.toLocaleString()}
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: up ? '#00C896' : '#FF4B4B' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: up ? '#FF8C00' : '#FF4B4B' }}>
               {up ? '▲' : '▼'} {up ? '+' : ''}{changeRate.toFixed(2)}%
             </div>
           </div>
@@ -95,7 +151,7 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
       {prediction?.companyDescription && (
         <div style={{
           marginBottom: 14,
-          background: 'linear-gradient(135deg, rgba(61,142,255,0.06) 0%, rgba(0,200,150,0.04) 100%)',
+          background: 'linear-gradient(135deg, rgba(61,142,255,0.06) 0%, rgba(255,140,0,0.04) 100%)',
           border: '1px solid rgba(255,255,255,0.07)',
           borderLeft: '3px solid #3D8EFF',
           borderRadius: 8, padding: '10px 14px',
@@ -113,8 +169,8 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
         </div>
       )}
 
-      {/* 스파크라인 차트 + 예측 밴드 */}
-      {bars.length > 1 && <SparkChart bars={bars} prediction={prediction} />}
+      {/* 스파크라인 차트 + 예측 밴드 + 과거 예측 마커 */}
+      {bars.length > 1 && <SparkChart bars={bars} prediction={prediction} history={predictHistory} />}
 
       {/* ── 동전주: 급등 가능성 점수 분석 (가격 기반 자동 판별 포함) ── */}
       {showPennyPanel && selectedStock ? (
@@ -155,7 +211,7 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
             <span style={{ fontSize: 12, fontWeight: 600 }}>방향성 분석</span>
             <span style={{
               marginLeft: 'auto', fontSize: 11, fontWeight: 700,
-              color: prediction.direction === 'up'   ? '#00C896'
+              color: prediction.direction === 'up'   ? '#FF8C00'
                    : prediction.direction === 'down' ? '#FF4B4B' : '#8892A8',
             }}>
               {prediction.direction === 'up' ? '▲ 상승'
@@ -231,7 +287,7 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
             <div style={{
               height: '100%', borderRadius: 4,
               width: `${prediction.confidence}%`,
-              background: 'linear-gradient(90deg,#00C896,#00E5B0)',
+              background: 'linear-gradient(90deg,#FF8C00,#00E5B0)',
               transition: 'width 0.5s',
             }} />
           </div>
@@ -248,16 +304,20 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
           {/* 지표 뱃지 */}
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             {prediction.indicators && [
-              `MA5 ${prediction.indicators.ma5.toLocaleString()}`,
-              `MA20 ${prediction.indicators.ma20.toLocaleString()}`,
-              `RSI ${prediction.indicators.rsi}`,
-            ].map(badge => (
-              <span key={badge} style={{
-                fontSize: 10, color: '#4B5675',
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                padding: '2px 7px', borderRadius: 4,
-              }}>{badge}</span>
+              {
+                label: `MA5 ${prediction.indicators.ma5.toLocaleString()}`,
+                tip: '5일 이동평균선 — 최근 5일 종가 평균.\n현재가가 MA5 위에 있으면 단기 강세 신호.',
+              },
+              {
+                label: `MA20 ${prediction.indicators.ma20.toLocaleString()}`,
+                tip: '20일 이동평균선 — 최근 20일 종가 평균.\nMA5가 MA20을 상향 돌파하면 골든크로스(매수 신호).',
+              },
+              {
+                label: `RSI ${prediction.indicators.rsi}`,
+                tip: '상대강도지수 (0~100)\n70 이상 → 과매수 (조정 가능성)\n30 이하 → 과매도 (반등 가능성)',
+              },
+            ].map(({ label, tip }) => (
+              <IndicatorBadge key={label} label={label} tip={tip} />
             ))}
           </div>
         </div>
@@ -340,7 +400,7 @@ function PennyScorePanel({ stock }: { stock: StockQuote }) {
   const totalScore = Math.min(volScore + momScore + lowScore + tvScore, 100)
 
   const items = [
-    { label: '거래량 폭발',  score: volScore,  max: 40, sub: avg10 > 0 ? volLabel : volLabel, color: '#00C896' },
+    { label: '거래량 폭발',  score: volScore,  max: 40, sub: avg10 > 0 ? volLabel : volLabel, color: '#FF8C00' },
     { label: '가격 모멘텀',  score: momScore,  max: 25, sub: `${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%`, color: '#3D8EFF' },
     { label: '저점 반등',    score: lowScore,  max: 20, sub: low52 > 0 ? `+${fromLowPct.toFixed(1)}%` : '-', color: '#F0B429' },
     { label: '거래대금',     score: tvScore,   max: 15, sub: tvLabel,  color: '#FF6B6B' },
@@ -359,7 +419,7 @@ function PennyScorePanel({ stock }: { stock: StockQuote }) {
         <span style={{ fontSize: 11, color: '#8892A8', fontWeight: 600 }}>급등 가능성 점수</span>
         <span style={{
           fontSize: 20, fontWeight: 800,
-          color: totalScore >= 70 ? '#00C896' : totalScore >= 40 ? '#F0B429' : '#FF6B6B',
+          color: totalScore >= 70 ? '#FF8C00' : totalScore >= 40 ? '#F0B429' : '#FF6B6B',
           fontVariantNumeric: 'tabular-nums',
         }}>{totalScore}<span style={{ fontSize: 11, color: '#4B5675', marginLeft: 2 }}>점</span></span>
       </div>
@@ -423,10 +483,23 @@ function ScoreBar({ label, score, max, sub, color }: {
 }
 
 // ── 고도화 차트: 가격 + 거래량 + MA + 예측밴드 + 호버 툴팁 ────────
-function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Prediction }) {
+function SparkChart({ bars, prediction, history = [] }: {
+  bars: OhlcvBar[]
+  prediction?: Prediction
+  history?: PredictionHistoryItem[]
+}) {
   const [hov,      setHov]      = useState<{ idx: number; px: number; py: number } | null>(null)
   const [predHov,  setPredHov]  = useState(false)
+  const [histHov,  setHistHov]  = useState<{ item: PredictionHistoryItem; px: number; py: number } | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // 날짜 → 바 인덱스 맵 (과거 예측 마커 매칭용)
+  const barDateMap = new Map(
+    bars.map((b, i) => [new Date(b.timestamp * 1000).toISOString().slice(0, 10), i])
+  )
+  const histMarkers = history
+    .map(item => ({ item, barIdx: barDateMap.get(item.createdAt.slice(0, 10)) }))
+    .filter((m): m is { item: PredictionHistoryItem; barIdx: number } => m.barIdx !== undefined)
 
   // ── 레이아웃 상수
   const W = 560, PAD_L = 6, PAD_R = 50, PAD_T = 8
@@ -454,8 +527,8 @@ function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Predi
   const lastClose = closes[closes.length - 1]
   const lastY     = toY(lastClose)
   const priceUp   = lastClose >= closes[0]
-  const priceCol  = priceUp ? '#00C896' : '#FF4B4B'
-  const predCol   = prediction?.direction === 'up'   ? '#00C896'
+  const priceCol  = priceUp ? '#FF8C00' : '#FF4B4B'
+  const predCol   = prediction?.direction === 'up'   ? '#FF8C00'
                   : prediction?.direction === 'down' ? '#FF4B4B' : '#8892A8'
 
   // ── 가격 경로 (cubic bezier)
@@ -595,7 +668,7 @@ function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Predi
         {/* 거래량 막대 */}
         {bars.map((b, i) => {
           const bH   = (b.volume / maxVol) * HV
-          const bCol = i > 0 && b.close >= bars[i-1].close ? '#00C896' : '#FF4B4B'
+          const bCol = i > 0 && b.close >= bars[i-1].close ? '#FF8C00' : '#FF4B4B'
           return (
             <rect key={i}
               x={toX(i) - barW / 2} y={volTop + HV - bH}
@@ -612,6 +685,32 @@ function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Predi
             {label}
           </text>
         ))}
+
+        {/* 과거 예측 마커 */}
+        {histMarkers.map(({ item, barIdx }) => {
+          const mx  = toX(barIdx)
+          const my  = toY(bars[barIdx].close)
+          const col = item.direction === 'up' ? '#FF8C00' : item.direction === 'down' ? '#FF4B4B' : '#8892A8'
+          return (
+            <g key={item.id}
+              onMouseMove={e => {
+                e.stopPropagation()
+                const wr = wrapRef.current?.getBoundingClientRect()
+                setHistHov({ item, px: wr ? e.clientX - wr.left : 0, py: wr ? e.clientY - wr.top : 0 })
+                setHov(null); setPredHov(false)
+              }}
+              onMouseLeave={() => setHistHov(null)}
+              style={{ cursor: 'pointer' }}
+            >
+              <circle cx={mx} cy={my} r={5} fill={col} opacity={0.15} />
+              <circle cx={mx} cy={my} r={3} fill={col} stroke="#080C17" strokeWidth={1} opacity={0.9} />
+              <text x={mx} y={my + 0.6} textAnchor="middle" dominantBaseline="middle"
+                fontSize={5} fill="#080C17" fontWeight="bold">
+                {item.direction === 'up' ? '▲' : item.direction === 'down' ? '▼' : '—'}
+              </text>
+            </g>
+          )
+        })}
 
         {/* 현재가 점 */}
         <circle cx={SP} cy={lastY} r="2.5" fill={priceCol} />
@@ -653,7 +752,7 @@ function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Predi
           </div>
           {([
             { label: '시', val: hBar.open,  col: '#C8D0E0' },
-            { label: '고', val: hBar.high,  col: '#00C896' },
+            { label: '고', val: hBar.high,  col: '#FF8C00' },
             { label: '저', val: hBar.low,   col: '#FF4B4B' },
             { label: '종', val: hBar.close, col: priceCol  },
           ] as { label: string; val: number; col: string }[]).map(({ label, val, col }) => (
@@ -724,6 +823,47 @@ function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Predi
         </div>
       )}
 
+      {/* 과거 예측 호버 툴팁 */}
+      {histHov && (
+        <div style={{
+          position:       'absolute',
+          top:            Math.max(4, histHov.py - 130),
+          ...(histHov.px < wrapW * 0.6 ? { left: histHov.px + 12 } : { right: wrapW - histHov.px + 12 }),
+          background:     'rgba(10,16,30,0.95)',
+          border:         `1px solid ${histHov.item.direction === 'up' ? '#FF8C00' : histHov.item.direction === 'down' ? '#FF4B4B' : '#8892A8'}40`,
+          borderRadius:   9, padding: '8px 11px',
+          fontSize:       10.5, color: '#C8D0E0',
+          pointerEvents:  'none', zIndex: 30,
+          backdropFilter: 'blur(10px)',
+          boxShadow:      '0 4px 28px rgba(0,0,0,0.6)',
+          minWidth:       140, lineHeight: 1.9,
+        }}>
+          <div style={{ fontSize: 9, color: '#4B5675', marginBottom: 3 }}>
+            {new Date(histHov.item.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })} 예측
+          </div>
+          <div style={{
+            fontWeight: 700, fontSize: 11, marginBottom: 5,
+            color: histHov.item.direction === 'up' ? '#FF8C00' : histHov.item.direction === 'down' ? '#FF4B4B' : '#8892A8',
+          }}>
+            {histHov.item.direction === 'up' ? '▲ 상승' : histHov.item.direction === 'down' ? '▼ 하락' : '— 중립'} 예측
+          </div>
+          {([
+            { label: '기준가',  val: histHov.item.basePrice   },
+            { label: '상단 목표', val: histHov.item.targetHigh },
+            { label: '하단 목표', val: histHov.item.targetLow  },
+          ] as { label: string; val: number }[]).map(({ label, val }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span style={{ color: '#4B5675' }}>{label}</span>
+              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{val.toLocaleString()}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+            <span style={{ color: '#4B5675' }}>신뢰도</span>
+            <span style={{ color: '#F0B429', fontWeight: 700 }}>{histHov.item.confidence}%</span>
+          </div>
+        </div>
+      )}
+
       {/* 범례 */}
       <div style={{
         display: 'flex', gap: 10, padding: '3px 4px 0',
@@ -733,6 +873,7 @@ function SparkChart({ bars, prediction }: { bars: OhlcvBar[], prediction?: Predi
         <span style={{ color: '#F0B429' }}>— MA5</span>
         <span style={{ color: '#3D8EFF' }}>— MA20</span>
         {prediction && <span style={{ color: predCol }}>┄ AI 예측</span>}
+        {histMarkers.length > 0 && <span style={{ color: '#8892A8' }}>● 과거 예측</span>}
       </div>
     </div>
   )

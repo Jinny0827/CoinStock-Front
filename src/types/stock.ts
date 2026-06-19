@@ -17,6 +17,7 @@ export interface StockQuote {
   per:             number
   pbr:             number
   score?:          number   // PennyStockEvaluator 100점 평가 점수 (동전주 탭 전용)
+  debtRatio?:      number   // 부채비율 % (동전주 탭 전용, 재무 수집 후 주입)
 }
 
 /** /api/financial/{symbol} */
@@ -171,6 +172,19 @@ export interface NewsItem {
     link:         string  // 기사 URL
     source:       string  // 언론사명
     published_at: string  // 발행일시 (KR: RFC 형식, US: yyyy-MM-dd HH:mm)
+}
+
+/** /api/predict/history/{symbol} */
+export interface PredictionHistoryItem {
+  id:          number
+  symbol:      string
+  createdAt:   string   // ISO 8601 (e.g. "2026-06-10T09:05:00Z")
+  direction:   'up' | 'down' | 'neutral'
+  confidence:  number
+  targetLow:   number
+  targetHigh:  number
+  basePrice:   number
+  horizonDays: number
 }
 
 /** /api/news/{symbol} */

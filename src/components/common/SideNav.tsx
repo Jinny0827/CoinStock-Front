@@ -104,8 +104,8 @@ function NavItem({
         display: 'flex', alignItems: 'center', gap: 10,
         padding: '8px 10px', borderRadius: 6,
         fontSize: 13, cursor: 'pointer',
-        color: active ? '#00C896' : '#8892A8',
-        background: active ? 'rgba(0,200,150,0.08)' : 'transparent',
+        color: active ? '#FF8C00' : '#8892A8',
+        background: active ? 'rgba(255,140,0,0.08)' : 'transparent',
         position: 'relative',
         transition: 'all 0.12s',
       }}
@@ -117,7 +117,7 @@ function NavItem({
           position: 'absolute', left: 0, top: '50%',
           transform: 'translateY(-50%)',
           width: 3, height: 16,
-          background: '#00C896', borderRadius: '0 2px 2px 0',
+          background: '#FF8C00', borderRadius: '0 2px 2px 0',
         }} />
       )}
       {icon}

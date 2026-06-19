@@ -72,9 +72,9 @@ export default function AppHeader() {
         >
           <div style={{
             width:7, height:7, borderRadius:'50%',
-            background:'#00C896', boxShadow:'0 0 6px #00C896',
+            background:'#FF8C00', boxShadow:'0 0 6px #FF8C00',
           }} />
-          <span style={{ fontSize:15, fontWeight:700, letterSpacing:'-0.5px' }}>지금</span>
+          <span style={{ fontSize:15, fontWeight:700, letterSpacing:'-0.5px' }}>동전주 도파민</span>
         </div>
 
         {/* 검색바 */}
@@ -118,7 +118,7 @@ export default function AppHeader() {
           </button>
           <div style={{
             width:28, height:28, borderRadius:'50%',
-            background:'linear-gradient(135deg,#3D8EFF,#00C896)',
+            background:'linear-gradient(135deg,#3D8EFF,#FF8C00)',
             fontSize:11, fontWeight:700,
             display:'flex', alignItems:'center', justifyContent:'center',
             color:'#fff', cursor:'pointer',
@@ -262,7 +262,7 @@ function SearchRow({
         </div>
         <div style={{
           fontSize:11, fontWeight:700,
-          color: up ? '#00C896' : '#FF4B4B',
+          color: up ? '#FF8C00' : '#FF4B4B',
         }}>
           {up ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(1)}%
         </div>
@@ -281,7 +281,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return (
     <span>
       {text.slice(0, idx)}
-      <span style={{ color:'#00C896', fontWeight:700 }}>
+      <span style={{ color:'#FF8C00', fontWeight:700 }}>
         {text.slice(idx, idx + query.length)}
       </span>
       {text.slice(idx + query.length)}

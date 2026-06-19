@@ -181,7 +181,7 @@ function AddModal({ onClose, onSubmit, loading }: {
 const btnStyle: React.CSSProperties = {
     padding: '8px 16px', borderRadius: 6,
     border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(0,200,150,0.1)', color: '#00C896',
+    background: 'rgba(255,140,0,0.1)', color: '#FF8C00',
     fontSize: 12, fontWeight: 600, cursor: 'pointer',
 }
 const labelStyle: React.CSSProperties = {

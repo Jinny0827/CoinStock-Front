@@ -59,7 +59,7 @@ export default function HistoryPage() {
                 <SummaryCard label="총 매수금액" value={totalBuy.toLocaleString()} unit="원" color="#3D8EFF" />
                 <SummaryCard label="총 매도금액" value={totalSell.toLocaleString()} unit="원" color="#8892A8" />
                 <SummaryCard label="실현 손익" value={(realized >= 0 ? '+' : '') + realized.toLocaleString()} unit="원"
-                             color={realized >= 0 ? '#00C896' : '#FF4B4B'} />
+                             color={realized >= 0 ? '#FF8C00' : '#FF4B4B'} />
             </div>
 
             {/* 거래 목록 */}
@@ -94,8 +94,8 @@ export default function HistoryPage() {
                             </div>
                             <span style={{
                                 fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 3,
-                                background: t.side === 'buy' ? 'rgba(0,200,150,0.1)' : 'rgba(255,75,75,0.1)',
-                                color: t.side === 'buy' ? '#00C896' : '#FF4B4B',
+                                background: t.side === 'buy' ? 'rgba(255,140,0,0.1)' : 'rgba(255,75,75,0.1)',
+                                color: t.side === 'buy' ? '#FF8C00' : '#FF4B4B',
                             }}>{t.side === 'buy' ? '매수' : '매도'}</span>
                             <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.price.toLocaleString()}</span>
                             <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{t.qty.toLocaleString()}</span>
@@ -181,11 +181,11 @@ function TradeModal({ onClose, onSubmit, loading }: {
                             <button key={s} onClick={() => setForm(f => ({ ...f, side: s }))} style={{
                                 flex: 1, padding: '8px 0', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600,
                                 border: '1px solid',
-                                borderColor: form.side === s ? (s === 'buy' ? '#00C896' : '#FF4B4B') : 'rgba(255,255,255,0.1)',
+                                borderColor: form.side === s ? (s === 'buy' ? '#FF8C00' : '#FF4B4B') : 'rgba(255,255,255,0.1)',
                                 background: form.side === s
-                                    ? (s === 'buy' ? 'rgba(0,200,150,0.1)' : 'rgba(255,75,75,0.1)')
+                                    ? (s === 'buy' ? 'rgba(255,140,0,0.1)' : 'rgba(255,75,75,0.1)')
                                     : 'transparent',
-                                color: form.side === s ? (s === 'buy' ? '#00C896' : '#FF4B4B') : '#4B5675',
+                                color: form.side === s ? (s === 'buy' ? '#FF8C00' : '#FF4B4B') : '#4B5675',
                             }}>
                                 {s === 'buy' ? '매수' : '매도'}
                             </button>
@@ -259,7 +259,7 @@ const inputStyle: React.CSSProperties = {
 }
 const btnStyle: React.CSSProperties = {
     padding: '8px 16px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(0,200,150,0.1)', color: '#00C896',
+    background: 'rgba(255,140,0,0.1)', color: '#FF8C00',
     fontSize: 12, fontWeight: 600, cursor: 'pointer',
 }
 const dateInputStyle: React.CSSProperties = {
