@@ -17,7 +17,7 @@ export default function MyPage() {
 
     if (!summary || summary.totalTrades === 0) return <Empty />
 
-    const pnlColor = (v: number) => v >= 0 ? '#00C896' : '#FF4B4B'
+    const pnlColor = (v: number) => v >= 0 ? '#FF8C00' : '#FF4B4B'
     const pnlSign  = (v: number) => v >= 0 ? '+' : ''
 
     return (
@@ -38,7 +38,7 @@ export default function MyPage() {
                     label="승률"
                     value={summary.winRate.toFixed(1)}
                     unit="%"
-                    color={summary.winRate >= 50 ? '#00C896' : '#FF4B4B'}
+                    color={summary.winRate >= 50 ? '#FF8C00' : '#FF4B4B'}
                 />
                 <StatCard
                     label="총 거래"

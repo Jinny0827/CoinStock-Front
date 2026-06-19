@@ -3,14 +3,14 @@ import { getEconomicPhase } from '../api/stockApi'
 import type { EconomicPhase } from '../types/stock'
 
 const PHASE_COLOR: Record<EconomicPhase['phase'], string> = {
-  EXPANSION:   '#00C896',
+  EXPANSION:   '#FF8C00',
   PEAK:        '#F0B429',
   CONTRACTION: '#FF4B4B',
   RECOVERY:    '#3D8EFF',
 }
 
 const PHASE_BG: Record<EconomicPhase['phase'], string> = {
-  EXPANSION:   'rgba(0,200,150,0.08)',
+  EXPANSION:   'rgba(255,140,0,0.08)',
   PEAK:        'rgba(240,180,41,0.08)',
   CONTRACTION: 'rgba(255,75,75,0.08)',
   RECOVERY:    'rgba(61,142,255,0.08)',
@@ -80,7 +80,7 @@ export default function EconomicPhasePage() {
         ) : (
           <>
             <IndicatorRow label="기준금리" value={`${data.interestRate.toFixed(2)}%`} color="#F0B429" />
-            <IndicatorRow label="VIX (공포지수)" value={data.vix.toFixed(1)} color={data.vix >= 30 ? '#FF4B4B' : data.vix >= 20 ? '#F0B429' : '#00C896'} />
+            <IndicatorRow label="VIX (공포지수)" value={data.vix.toFixed(1)} color={data.vix >= 30 ? '#FF4B4B' : data.vix >= 20 ? '#F0B429' : '#FF8C00'} />
             <IndicatorRow label="WTI 원유" value={`$${data.wtiOil.toFixed(1)}`} color="#8892A8" />
             <IndicatorRow label="금 (Gold)" value={`$${Math.round(data.gold).toLocaleString()}`} color="#F0B429" />
           </>

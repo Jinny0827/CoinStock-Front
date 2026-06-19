@@ -62,7 +62,7 @@ export default function RightPanel() {
           {/* 그라디언트 바 */}
           <div style={{
             height: 3, borderRadius: 2,
-            background: 'linear-gradient(90deg,#FF4B4B,#FF8C42,#F0B429,#6BCB77,#00C896)',
+            background: 'linear-gradient(90deg,#FF4B4B,#FF8C42,#F0B429,#6BCB77,#FF8C00)',
             position: 'relative',
           }}>
             <div style={{
@@ -126,13 +126,13 @@ export default function RightPanel() {
                 label="기준금리"
                 value={macro.interestRate.toFixed(2)}
                 unit="%"
-                dot={macro.interestRate >= 4 ? '#FF8C42' : '#00C896'}
+                dot={macro.interestRate >= 4 ? '#FF8C42' : '#FF8C00'}
               />
               <MacroRow
                 label="VIX"
                 value={macro.vix.toFixed(1)}
                 unit=""
-                dot={macro.vix >= 30 ? '#FF4B4B' : macro.vix >= 20 ? '#FF8C42' : '#00C896'}
+                dot={macro.vix >= 30 ? '#FF4B4B' : macro.vix >= 20 ? '#FF8C42' : '#FF8C00'}
               />
               <MacroRow
                 label="WTI"
@@ -202,7 +202,7 @@ function gaugeColor(score: number) {
   if (score < 40) return '#FF8C42'
   if (score < 60) return '#8892A8'
   if (score < 80) return '#6BCB77'
-  return '#00C896'
+  return '#FF8C00'
 }
 
 // ── 공통 UI ────────────────────────────────────────────────
@@ -227,7 +227,7 @@ function MarketRow({
         {change !== 0 && (
           <div style={{
             fontSize: 10, fontWeight: 600,
-            color: up ? '#00C896' : '#FF4B4B',
+            color: up ? '#FF8C00' : '#FF4B4B',
           }}>
             {up ? '▲' : '▼'} {Math.abs(change).toFixed(2)}%
           </div>

@@ -29,7 +29,7 @@ export default function BottomNav() {
                         flex: 1, display: 'flex', flexDirection: 'column',
                         alignItems: 'center', justifyContent: 'center',
                         gap: 3, background: 'none', border: 'none', cursor: 'pointer',
-                        color: active ? '#00C896' : '#4B5675',
+                        color: active ? '#FF8C00' : '#4B5675',
                         transition: 'color 0.1s',
                     }}>
                         <span style={{fontSize: 18, lineHeight: 1}}>{item.icon}</span>

@@ -18,15 +18,16 @@ const THEME_MAP: Record<string, string> = {
 }
 
 export default function HotStockList() {
-  const [tab, setTab] = useState<TabType>('세력감지')
+  const [tab,       setTab]       = useState<TabType>('세력감지')
+  const [dirFilter, setDirFilter] = useState<'all' | 'up' | 'down'>('all')
   const { selectedSymbol, setSelectedSymbol, setSelectedStock } = useStockStore()
   const qc = useQueryClient()
 
   const handleTabChange = useCallback((newTab: TabType) => {
-    // 비활성 탭의 캐시를 제거해 스테일 데이터가 다른 탭에 섞이지 않도록 방지
     if (newTab !== '국장') qc.removeQueries({ queryKey: ['penny-kr'] })
     if (newTab !== '미장') qc.removeQueries({ queryKey: ['penny-us'] })
     setTab(newTab)
+    setDirFilter('all')
   }, [qc])
 
   const { data: forceData = [] } = useQuery({
@@ -59,10 +60,16 @@ export default function HotStockList() {
   }
 
   // 세력감지: 등락률 절댓값 내림차순 / 국장·미장: 서버 score 순 유지
-  const list = (tab === '세력감지'
-    ? listMap['세력감지'].slice().sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
-    : listMap[tab].slice()
-  ).slice(0, 100)
+  const list = (() => {
+    const base = (tab === '세력감지'
+      ? listMap['세력감지'].slice().sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+      : listMap[tab].slice()
+    )
+    const dir = dirFilter === 'up'   ? base.filter(s => s.changePercent > 0)
+              : dirFilter === 'down' ? base.filter(s => s.changePercent < 0)
+              : base
+    return dir.slice(0, 100)
+  })()
 
   const maxVol = Math.max(...list.map(s => s.volume), 1)
 
@@ -90,7 +97,7 @@ export default function HotStockList() {
         flexShrink: 0,
       }}>
         <LiveDot />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>동전주 · 세력 감지</span>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>동전주 도파민 · 세력 감지</span>
         <span style={{ fontSize: 11, color: '#4B5675', marginLeft: 'auto' }}>
           실시간 · KST
         </span>
@@ -106,10 +113,31 @@ export default function HotStockList() {
           <div key={t} onClick={() => handleTabChange(t)} style={{
             padding: '9px 14px', fontSize: 12, fontWeight: 500,
             cursor: 'pointer',
-            color: tab === t ? '#00C896' : '#4B5675',
-            borderBottom: `2px solid ${tab === t ? '#00C896' : 'transparent'}`,
+            color: tab === t ? '#FF8C00' : '#4B5675',
+            borderBottom: `2px solid ${tab === t ? '#FF8C00' : 'transparent'}`,
             transition: 'all 0.12s',
           }}>{t}</div>
+        ))}
+      </div>
+
+      {/* 전체/상승/하락 필터 */}
+      <div style={{
+        display: 'flex', justifyContent: 'flex-end', gap: 4,
+        padding: '6px 20px',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+        flexShrink: 0,
+      }}>
+        {(['all', 'up', 'down'] as const).map(d => (
+          <button
+            key={d}
+            onClick={() => setDirFilter(d)}
+            style={{
+              fontSize: 10, padding: '2px 9px', borderRadius: 4, cursor: 'pointer',
+              border: `1px solid ${dirFilter === d ? (d === 'up' ? 'rgba(255,140,0,0.4)' : d === 'down' ? 'rgba(100,160,255,0.4)' : 'rgba(255,255,255,0.15)') : 'rgba(255,255,255,0.07)'}`,
+              background: dirFilter === d ? (d === 'up' ? 'rgba(255,140,0,0.08)' : d === 'down' ? 'rgba(100,160,255,0.08)' : 'rgba(255,255,255,0.05)') : 'transparent',
+              color: dirFilter === d ? (d === 'up' ? '#FF8C00' : d === 'down' ? '#64A0FF' : '#A0AEC0') : '#4B5675',
+            }}
+          >{d === 'all' ? '전체' : d === 'up' ? '상승' : '하락'}</button>
         ))}
       </div>
 
@@ -179,7 +207,7 @@ function StockRow({
                 alignItems: 'center',
                 gap: 12, padding: '10px 20px',
                 cursor: 'pointer',
-                background: selected ? 'rgba(0,200,150,0.05)' : 'transparent',
+                background: selected ? 'rgba(255,140,0,0.05)' : 'transparent',
                 transition: 'background 0.1s',
             }}
                  onMouseEnter={e => { if (!selected) e.currentTarget.style.background = 'rgba(255,255,255,0.025)' }}
@@ -201,8 +229,8 @@ function StockRow({
                         {showScore && stock.score != null && stock.score > 0 && (
                             <span style={{
                                 background: stock.score >= 70
-                                    ? 'rgba(0,200,150,0.15)' : 'rgba(61,142,255,0.12)',
-                                color: stock.score >= 70 ? '#00C896' : '#3D8EFF',
+                                    ? 'rgba(255,140,0,0.15)' : 'rgba(61,142,255,0.12)',
+                                color: stock.score >= 70 ? '#FF8C00' : '#3D8EFF',
                                 fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
                             }}>{stock.score}점</span>
                         )}
@@ -227,8 +255,8 @@ function StockRow({
                         fontSize: 10, fontWeight: 700,
                         padding: '2px 6px', borderRadius: 3,
                         fontVariantNumeric: 'tabular-nums',
-                        background: up ? 'rgba(0,200,150,0.12)' : 'rgba(255,75,75,0.1)',
-                        color: up ? '#00C896' : '#FF4B4B',
+                        background: up ? 'rgba(255,140,0,0.12)' : 'rgba(255,75,75,0.1)',
+                        color: up ? '#FF8C00' : '#FF4B4B',
                     }}>
             {up ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(1)}%
           </span>
@@ -254,7 +282,7 @@ function StockRow({
                         height: '100%', borderRadius: 1,
                         width: `${volRatio}%`,
                         background: up
-                            ? 'linear-gradient(90deg,rgba(0,200,150,0.5),rgba(0,200,150,0.15))'
+                            ? 'linear-gradient(90deg,rgba(255,140,0,0.5),rgba(255,140,0,0.15))'
                             : 'linear-gradient(90deg,rgba(255,75,75,0.5),rgba(255,75,75,0.15))',
                         transition: 'width 0.3s',
                     }} />
@@ -268,7 +296,7 @@ function LiveDot() {
   return (
     <div style={{
       width: 6, height: 6, borderRadius: '50%',
-      background: '#00C896', boxShadow: '0 0 5px #00C896',
+      background: '#FF8C00', boxShadow: '0 0 5px #FF8C00',
       animation: 'none',
       flexShrink: 0,
     }} />
@@ -287,7 +315,7 @@ function EmptyState({ tab, loading }: { tab: TabType; loading?: boolean }) {
         <div style={{
           width: 18, height: 18, borderRadius: '50%',
           border: '2px solid rgba(255,255,255,0.08)',
-          borderTopColor: '#00C896',
+          borderTopColor: '#FF8C00',
           animation: 'spin 0.7s linear infinite',
         }} />
         <div style={{ fontSize: 11, color: '#4B5675' }}>불러오는 중…</div>

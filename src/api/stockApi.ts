@@ -1,7 +1,7 @@
 import client from './client'
 import type {
     StockQuote, FinancialData, OhlcvBar,
-    Prediction, FearGreed, FxRate, MacroData,
+    Prediction, PredictionHistoryItem, FearGreed, FxRate, MacroData,
     EconomicPhase, ValueStock,
     ForceStock, Trade, PortfolioSummary, WatchlistItem, StockNews,
 } from '../types/stock'
@@ -19,11 +19,6 @@ export const getKrPennyStocks = () =>
 export const getUsPennyStocks = () =>
   client.get<{ code:string; data: StockQuote[] }>('/api/penny/us').then(r => r.data.data)
 
-export const getKrStocks      = () =>
-  client.get<{ code:string; data: StockQuote[] }>('/api/market/kr').then(r => r.data.data)
-
-export const getUsStocks      = () =>
-  client.get<{ code:string; data: StockQuote[] }>('/api/market/us').then(r => r.data.data)
 
 /** 종목분석 전용: 국장 주요 10종목 (삼성전자 등) */
 export const getKrMainStocks  = () =>
@@ -52,6 +47,9 @@ export const getEconomicPhase = () =>
 export const getValueScreener = () =>
   client.get<{ code:string; data: ValueStock[]; total: number }>('/api/screener/value').then(r => r.data)
 
+export const refreshFinancials = () =>
+  client.post<{ code:string; message: string }>('/api/admin/financials/refresh').then(r => r.data)
+
 // ── 종목 상세 ──────────────────────────────────────────────
 export const getFinancial     = (symbol: string) =>
   client.get<FinancialData & { code:string }>(`/api/financial/${symbol}`).then(r => r.data)
@@ -61,8 +59,11 @@ export const getOhlcv         = (symbol: string, interval = '1d', range = '1mo')
     params: { interval, range },
   }).then(r => r.data.bars)
 
-export const getPredict       = (symbol: string) =>
+export const getPredict        = (symbol: string) =>
   client.get<{ code:string; data: Prediction }>(`/api/predict/${symbol}`).then(r => r.data.data)
+
+export const getPredictHistory = (symbol: string) =>
+  client.get<{ code:string; data: PredictionHistoryItem[] }>(`/api/predict/history/${symbol}`).then(r => r.data.data)
 
 export const getStockNews     = (symbol: string) =>
     client.get<{ code:string } & StockNews>(`/api/news/${symbol}`).then(r => r.data)

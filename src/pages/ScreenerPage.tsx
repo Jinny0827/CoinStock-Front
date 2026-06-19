@@ -1,11 +1,12 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { getValueScreener } from '../api/stockApi'
+import { getValueScreener, refreshFinancials } from '../api/stockApi'
 
 export default function ScreenerPage() {
   const navigate = useNavigate()
-
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['valueScreener'],
@@ -19,6 +20,21 @@ export default function ScreenerPage() {
     navigate('/analysis', { state: { symbol, name } })
   }
 
+  const handleRefreshFinancials = async () => {
+    if (refreshing) return
+    setRefreshing(true)
+    setRefreshMsg(null)
+    try {
+      const res = await refreshFinancials()
+      setRefreshMsg(res.message ?? '수집 시작')
+    } catch {
+      setRefreshMsg('요청 실패')
+    } finally {
+      setRefreshing(false)
+      setTimeout(() => setRefreshMsg(null), 4000)
+    }
+  }
+
   return (
     <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, gap: 10 }}>
@@ -29,6 +45,23 @@ export default function ScreenerPage() {
             padding: '2px 8px', borderRadius: 10,
           }}>총 {data.total}개</span>
         )}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          {refreshMsg && (
+            <span style={{ fontSize: 11, color: '#4CAF50' }}>{refreshMsg}</span>
+          )}
+          <button
+            onClick={handleRefreshFinancials}
+            disabled={refreshing}
+            style={{
+              fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.12)',
+              background: refreshing ? 'rgba(255,255,255,0.04)' : 'rgba(61,142,255,0.12)',
+              color: refreshing ? '#4B5675' : '#5B9CF6',
+              cursor: refreshing ? 'default' : 'pointer',
+            }}
+          >
+            {refreshing ? '수집 중…' : 'EPS/PER/PBR 수집'}
+          </button>
+        </div>
       </div>
 
       {/* 기준 안내 */}
@@ -47,10 +80,14 @@ export default function ScreenerPage() {
         <div style={{ overflowX: 'auto', borderRadius: 8 }}>
           <div style={{
             background: '#0E1525', border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: 8, overflow: 'hidden', minWidth: 620,
+            borderRadius: 8, minWidth: 620,
           }}>
-            {/* 테이블 헤더 */}
-            <div style={{ ...rowStyle, background: 'rgba(255,255,255,0.03)', color: '#4B5675', fontSize: 11 }}>
+            {/* 테이블 헤더 — sticky */}
+            <div style={{
+              ...rowStyle, background: '#0E1525', color: '#4B5675', fontSize: 11,
+              position: 'sticky', top: 0, zIndex: 1,
+              borderBottom: '1px solid rgba(255,255,255,0.07)',
+            }}>
               <span>종목</span>
               <span style={{ textAlign: 'right' }}>EPS</span>
               <span style={{ textAlign: 'right' }}>PER</span>
@@ -59,39 +96,42 @@ export default function ScreenerPage() {
               <span style={{ textAlign: 'right' }}>영업이익률</span>
             </div>
 
-            {list.map((s, i) => (
-              <div
-                key={s.symbol}
-                style={{
-                  ...rowStyle,
-                  borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.04)',
-                  fontSize: 13, cursor: 'pointer', transition: 'background 0.1s',
-                }}
-                onClick={() => handleClick(s.symbol, s.name)}
-                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <div>
-                  <div style={{ fontWeight: 600 }}>{s.name}</div>
-                  <div style={{ fontSize: 10, color: '#4B5675', marginTop: 2 }}>{s.symbol}</div>
+            {/* 스크롤 영역 */}
+            <div style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
+              {list.map((s, i) => (
+                <div
+                  key={s.symbol}
+                  style={{
+                    ...rowStyle,
+                    borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.04)',
+                    fontSize: 13, cursor: 'pointer', transition: 'background 0.1s',
+                  }}
+                  onClick={() => handleClick(s.symbol, s.name)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{s.name}</div>
+                    <div style={{ fontSize: 10, color: '#4B5675', marginTop: 2 }}>{s.symbol}</div>
+                  </div>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#E2E8F0' }}>
+                    {s.eps.toLocaleString()}
+                  </span>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.per < 10 ? '#FF8C00' : '#E2E8F0' }}>
+                    {s.per.toFixed(1)}
+                  </span>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.pbr < 1 ? '#FF8C00' : '#E2E8F0' }}>
+                    {s.pbr.toFixed(2)}
+                  </span>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.revenueGrowth > 10 ? '#FF8C00' : '#E2E8F0' }}>
+                    {s.revenueGrowth.toFixed(1)}%
+                  </span>
+                  <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.operatingMargin > 15 ? '#FF8C00' : '#E2E8F0' }}>
+                    {s.operatingMargin.toFixed(1)}%
+                  </span>
                 </div>
-                <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: '#E2E8F0' }}>
-                  {s.eps.toLocaleString()}
-                </span>
-                <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.per < 10 ? '#00C896' : '#E2E8F0' }}>
-                  {s.per.toFixed(1)}
-                </span>
-                <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.pbr < 1 ? '#00C896' : '#E2E8F0' }}>
-                  {s.pbr.toFixed(2)}
-                </span>
-                <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.revenueGrowth > 10 ? '#00C896' : '#E2E8F0' }}>
-                  {s.revenueGrowth.toFixed(1)}%
-                </span>
-                <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: s.operatingMargin > 15 ? '#00C896' : '#E2E8F0' }}>
-                  {s.operatingMargin.toFixed(1)}%
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
