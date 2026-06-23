@@ -3,7 +3,7 @@ import type {
     StockQuote, FinancialData, OhlcvBar,
     Prediction, PredictionHistoryItem, FearGreed, FxRate, MacroData,
     EconomicPhase, ValueStock,
-    ForceStock, Trade, PortfolioSummary, WatchlistItem, StockNews,
+    ForceStock, Trade, PortfolioSummary, WatchlistItem, StockNews, MarketSession,
 } from '../types/stock'
 
 // ── 시세 ──────────────────────────────────────────────────
@@ -43,6 +43,9 @@ export const getMacroData     = () =>
 
 export const getEconomicPhase = () =>
   client.get<EconomicPhase & { code:string }>('/api/economy/phase').then(r => r.data)
+
+export const getMarketSession = () =>
+  client.get<MarketSession & { code:string }>('/api/market/session').then(r => r.data)
 
 export const getValueScreener = () =>
   client.get<{ code:string; data: ValueStock[]; total: number }>('/api/screener/value').then(r => r.data)

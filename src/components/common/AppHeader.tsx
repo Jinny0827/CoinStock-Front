@@ -2,15 +2,29 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getAllStocks } from '../../api/stockApi'
+import { logout as logoutApi } from '../../api/authApi'
 import { useStockStore } from '../../store/stockStore'
+import { useAuthStore } from '../../store/authStore'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
+import MarketSessionBadge from './MarketSessionBadge'
 import type { StockQuote } from '../../types/stock'
 
 export default function AppHeader() {
   const [searchOpen, setSearchOpen]   = useState(false)
   const [query,      setQuery]        = useState('')
+  const [menuOpen,   setMenuOpen]     = useState(false)
   const inputRef                      = useRef<HTMLInputElement>(null)
   const navigate                      = useNavigate()
+  const isDesktop                     = useIsDesktop()
   const { setSelectedSymbol, setSelectedStock } = useStockStore()
+  const { user, clearAuth } = useAuthStore()
+
+  async function handleLogout() {
+    try { await logoutApi() } catch { /* 토큰 만료 시에도 로컬 로그아웃은 진행 */ }
+    clearAuth()
+    setMenuOpen(false)
+    navigate('/login')
+  }
 
   // 검색창 열릴 때만 전체 종목 로드
   const { data: allStocks = [] } = useQuery({
@@ -103,7 +117,8 @@ export default function AppHeader() {
         </div>
 
         {/* 우측 버튼 */}
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginLeft:'auto' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, marginLeft:'auto', position:'relative' }}>
+          {isDesktop && <MarketSessionBadge />}
           <button style={{
             width:32, height:32, borderRadius:6,
             border:'1px solid rgba(255,255,255,0.07)',
@@ -116,13 +131,63 @@ export default function AppHeader() {
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
           </button>
-          <div style={{
-            width:28, height:28, borderRadius:'50%',
-            background:'linear-gradient(135deg,#3D8EFF,#FF8C00)',
-            fontSize:11, fontWeight:700,
-            display:'flex', alignItems:'center', justifyContent:'center',
-            color:'#fff', cursor:'pointer',
-          }}>K</div>
+
+          {user ? (
+            <>
+              <div
+                onClick={() => setMenuOpen(v => !v)}
+                style={{
+                  width:28, height:28, borderRadius:'50%',
+                  background:'linear-gradient(135deg,#3D8EFF,#FF8C00)',
+                  fontSize:11, fontWeight:700,
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  color:'#fff', cursor:'pointer',
+                }}
+              >{(user.nickname || user.email).charAt(0).toUpperCase()}</div>
+
+              {menuOpen && (
+                <div
+                  onClick={() => setMenuOpen(false)}
+                  style={{ position:'fixed', inset:0, zIndex:999 }}
+                >
+                  <div
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      position:'absolute', top:42, right:20,
+                      width:180, background:'#111827',
+                      border:'1px solid rgba(255,255,255,0.1)',
+                      borderRadius:8, padding:8, zIndex:1000,
+                    }}
+                  >
+                    <div style={{ padding:'6px 8px 10px', borderBottom:'1px solid rgba(255,255,255,0.07)', marginBottom:6 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:'#E2E8F0' }}>{user.nickname || user.email}</div>
+                      <div style={{ fontSize:10, color:'#4B5675', marginTop:2 }}>{user.email}</div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      style={{
+                        width:'100%', textAlign:'left', padding:'8px',
+                        background:'transparent', border:'none', borderRadius:6,
+                        color:'#FF4B4B', fontSize:12, cursor:'pointer',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,75,75,0.08)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >로그아웃</button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              style={{
+                height:32, padding:'0 14px', borderRadius:6,
+                border:'1px solid rgba(255,140,0,0.4)',
+                background:'rgba(255,140,0,0.08)', color:'#FF8C00',
+                fontSize:12, fontWeight:600, cursor:'pointer',
+              }}
+            >로그인</button>
+          )}
         </div>
       </header>
 
