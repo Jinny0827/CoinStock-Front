@@ -193,3 +193,11 @@ export interface StockNews {
     disclosures: DisclosureItem[]  // KR: DART 공시, US: 빈 배열
     news:        NewsItem[]        // KR: Google RSS, US: Yahoo Finance
 }
+
+/** /api/market/session — 토스 market-calendar 기반 장 운영 상태 */
+export type MarketSessionState = 'PRE_MARKET' | 'REGULAR' | 'AFTER_MARKET' | 'CLOSED'
+
+export interface MarketSession {
+    kr: MarketSessionState
+    us: MarketSessionState
+}

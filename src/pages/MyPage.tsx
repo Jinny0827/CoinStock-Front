@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { getPortfolioSummary } from '../api/stockApi'
 import { useStockStore } from '../store/stockStore'
+import TossAccountSection from '../components/mypage/TossAccountSection'
 
 export default function MyPage() {
     const navigate = useNavigate()
@@ -13,19 +14,29 @@ export default function MyPage() {
         queryFn: getPortfolioSummary,
     })
 
-    if (isLoading) return <Loading />
+    return (
+        <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
 
-    if (!summary || summary.totalTrades === 0) return <Empty />
+            <TossAccountSection />
 
+            {isLoading ? <Loading /> : !summary || summary.totalTrades === 0 ? <Empty /> : (
+                <PortfolioSummaryView summary={summary} navigate={navigate} setSelectedSymbol={setSelectedSymbol} />
+            )}
+        </div>
+    )
+}
+
+function PortfolioSummaryView({ summary, navigate, setSelectedSymbol }: {
+    summary: NonNullable<ReturnType<typeof useQuery<Awaited<ReturnType<typeof getPortfolioSummary>>>>['data']>
+    navigate: ReturnType<typeof useNavigate>
+    setSelectedSymbol: (symbol: string) => void
+}) {
     const pnlColor = (v: number) => v >= 0 ? '#FF8C00' : '#FF4B4B'
     const pnlSign  = (v: number) => v >= 0 ? '+' : ''
 
     return (
-        <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
-
-            {/* 헤더 */}
-            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
-
+        <>
             {/* 요약 카드 4개 — 2열 고정 (모바일/데스크탑 모두) */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 20 }}>
                 <StatCard
@@ -112,7 +123,7 @@ export default function MyPage() {
                 </div>
                 </div>
             )}
-        </div>
+        </>
     )
 }
 
@@ -144,15 +155,12 @@ function Loading() {
 
 function Empty() {
     return (
-        <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
-            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
-            <div style={{
-                background: '#0E1525', border: '1px solid rgba(255,255,255,0.07)',
-                borderRadius: 8, padding: '60px 0', textAlign: 'center',
-            }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
-                <div style={{ fontSize: 13, color: '#4B5675' }}>거래 기록이 없습니다</div>
-            </div>
+        <div style={{
+            background: '#0E1525', border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 8, padding: '60px 0', textAlign: 'center',
+        }}>
+            <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
+            <div style={{ fontSize: 13, color: '#4B5675' }}>거래 기록이 없습니다</div>
         </div>
     )
 }
