@@ -2,6 +2,8 @@ import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useStockStore } from '../../store/stockStore'
 import { getFinancial, getOhlcv, getPredict, getPredictHistory, getStockNews } from '../../api/stockApi'
+import TradingStatusBadges from './TradingStatusBadges'
+import StockOrderEntry from './StockOrderEntry'
 import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem, Prediction, PredictionHistoryItem } from '../../types/stock'
 
 interface Props {
@@ -145,6 +147,10 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
             </div>
           </div>
         )}
+
+        {isKrSymbol && <TradingStatusBadges symbol={symbol} currentPrice={currentPrice} />}
+
+        <StockOrderEntry symbol={symbol} name={displayName} currentPrice={currentPrice} />
       </div>
 
       {/* 회사 소개 */}

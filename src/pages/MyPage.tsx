@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { getPortfolioSummary } from '../api/stockApi'
 import { useStockStore } from '../store/stockStore'
 import TossAccountSection from '../components/mypage/TossAccountSection'
+import TotpSetupSection from '../components/mypage/TotpSetupSection'
+import TossOrderSection from '../components/mypage/TossOrderSection'
 
 export default function MyPage() {
     const navigate = useNavigate()
@@ -12,13 +14,16 @@ export default function MyPage() {
     const { data: summary, isLoading } = useQuery({
         queryKey: ['portfolio'],
         queryFn: getPortfolioSummary,
+        refetchOnMount: 'always',
     })
 
     return (
-        <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
+        <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: '16px', maxWidth: 800, margin: '0 auto' }}>
             <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>마이페이지</h2>
 
             <TossAccountSection />
+            <TotpSetupSection />
+            <TossOrderSection />
 
             {isLoading ? <Loading /> : !summary || summary.totalTrades === 0 ? <Empty /> : (
                 <PortfolioSummaryView summary={summary} navigate={navigate} setSelectedSymbol={setSelectedSymbol} />
