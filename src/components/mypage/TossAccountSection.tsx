@@ -44,7 +44,6 @@ export default function TossAccountSection() {
     queryKey: ['toss-holdings'],
     queryFn: getTossHoldings,
     enabled: connected,
-    retry: false,
     refetchOnMount: 'always',
   })
 

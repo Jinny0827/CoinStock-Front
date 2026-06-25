@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTossAccountStatus, getTossOrders, cancelTossOrder } from '../../api/tossApi'
+import { getAllStocks } from '../../api/stockApi'
 import type { TossOrder } from '../../types/toss'
 
 export default function TossOrderSection() {
@@ -10,6 +11,11 @@ export default function TossOrderSection() {
   const { data: status } = useQuery({ queryKey: ['toss-status'], queryFn: getTossAccountStatus, refetchOnMount: 'always' })
   const connected = status?.connected ?? false
 
+  // 토스 주문 응답엔 symbol(코드)만 있고 name이 없어서, 전체 종목 목록에서 이름을 따로 매핑
+  const { data: allStocks = [] } = useQuery({ queryKey: ['stocks-all'], queryFn: getAllStocks, staleTime: 30_000 })
+  const nameOf = (symbol: string) =>
+    allStocks.find(s => s.symbol.replace(/\.(KS|KQ)$/, '') === symbol)?.name ?? symbol
+
   const {
     data: ordersPage, isLoading: ordersLoading,
     isError: ordersError, error: ordersErrorObj, refetch: refetchOrders,
@@ -17,7 +23,6 @@ export default function TossOrderSection() {
     queryKey: ['toss-orders', statusTab],
     queryFn:  () => getTossOrders(statusTab),
     enabled:  connected,
-    retry:    false,
     refetchOnMount: 'always',
   })
 
@@ -59,7 +64,7 @@ export default function TossOrderSection() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {ordersPage!.orders.map(o => (
-              <OrderRow key={o.orderId} order={o} cancellable={statusTab === 'OPEN'} onCancel={() => handleCancel(o.orderId)} />
+              <OrderRow key={o.orderId} order={o} name={nameOf(o.symbol)} cancellable={statusTab === 'OPEN'} onCancel={() => handleCancel(o.orderId)} />
             ))}
           </div>
         )}
@@ -68,8 +73,8 @@ export default function TossOrderSection() {
   )
 }
 
-function OrderRow({ order, cancellable, onCancel }: {
-  order: TossOrder; cancellable: boolean; onCancel: () => void
+function OrderRow({ order, name, cancellable, onCancel }: {
+  order: TossOrder; name: string; cancellable: boolean; onCancel: () => void
 }) {
   const sideColor    = order.side === 'BUY' ? '#FF8C00' : '#3D8EFF'
   const qty          = Number(order.quantity)
@@ -82,7 +87,7 @@ function OrderRow({ order, cancellable, onCancel }: {
           <span style={{ color: sideColor, fontWeight: 700, marginRight: 6 }}>
             {order.side === 'BUY' ? '매수' : '매도'}
           </span>
-          {order.symbol}
+          {name}
         </div>
         <div style={{ fontSize: 10, color: '#4B5675', marginTop: 2 }}>
           {qty.toLocaleString()}주 · {order.status} · {new Date(order.orderedAt).toLocaleString('ko-KR')}
