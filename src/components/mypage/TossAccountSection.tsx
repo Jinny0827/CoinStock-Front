@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { connectTossAccount, disconnectTossAccount, getTossAccountStatus, getTossHoldings } from '../../api/tossApi'
+import { connectTossAccount, disconnectTossAccount, getTossAccountStatus, getTossHoldings, getTossBuyingPower } from '../../api/tossApi'
 import type { TossHoldings } from '../../types/toss'
 
 // 토스 API는 모든 수치를 문자열로 내려준다 — 안전하게 숫자로 변환
@@ -35,6 +35,7 @@ export default function TossAccountSection() {
   const { data: status, isLoading: statusLoading } = useQuery({
     queryKey: ['toss-status'],
     queryFn: getTossAccountStatus,
+    refetchOnMount: 'always',
   })
 
   const connected = status?.connected ?? false
@@ -43,7 +44,22 @@ export default function TossAccountSection() {
     queryKey: ['toss-holdings'],
     queryFn: getTossHoldings,
     enabled: connected,
-    retry: false,
+    refetchOnMount: 'always',
+  })
+
+  const { data: krBP } = useQuery({
+    queryKey: ['toss-buying-power', 'KRW'],
+    queryFn:  () => getTossBuyingPower('KRW'),
+    enabled:  connected,
+    staleTime: 30_000,
+    refetchOnMount: 'always',
+  })
+  const { data: usBP } = useQuery({
+    queryKey: ['toss-buying-power', 'USD'],
+    queryFn:  () => getTossBuyingPower('USD'),
+    enabled:  connected,
+    staleTime: 30_000,
+    refetchOnMount: 'always',
   })
 
   async function handleDisconnect() {
@@ -66,12 +82,18 @@ export default function TossAccountSection() {
         {statusLoading ? (
           <Dim>연동 상태 확인 중...</Dim>
         ) : connected ? (
-          <HoldingsView
-            loading={holdingsLoading}
-            holdings={holdings}
-            error={holdingsError ? (holdingsErrorObj as Error)?.message : undefined}
-            onRetry={() => refetchHoldings()}
-          />
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 14 }}>
+              <MiniStat label="매수가능 (KRW)" lines={[{ text: krBP ? fmtKrw(num(krBP.cashBuyingPower)) : '-' }]} />
+              <MiniStat label="매수가능 (USD)" lines={[{ text: usBP ? fmtUsd(num(usBP.cashBuyingPower)) : '-' }]} />
+            </div>
+            <HoldingsView
+              loading={holdingsLoading}
+              holdings={holdings}
+              error={holdingsError ? (holdingsErrorObj as Error)?.message : undefined}
+              onRetry={() => refetchHoldings()}
+            />
+          </>
         ) : (
           <ConnectForm onConnected={() => {
             queryClient.invalidateQueries({ queryKey: ['toss-status'] })

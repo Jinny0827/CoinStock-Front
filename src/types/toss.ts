@@ -57,3 +57,81 @@ export interface TossHoldings {
 export interface TossHoldingsEnvelope {
   result: TossHoldings
 }
+
+export interface TossWarning {
+  warningType: string  // LIQUIDATION_TRADING | OVERHEATED | INVESTMENT_WARNING 등
+  exchange: string
+  startDate: string
+  endDate: string
+}
+
+export interface TossPriceLimits {
+  timestamp: string
+  upperLimitPrice: string | number | null
+  lowerLimitPrice: string | number | null
+  currency: string
+}
+
+export interface TossOrderExecution {
+  filledQuantity?: string
+  averageFilledPrice?: string
+  filledAmount?: string
+  commission?: string
+  tax?: string
+  filledAt?: string | null
+  settlementDate?: string | null
+}
+
+export interface TossOrder {
+  orderId: string
+  symbol: string
+  side: 'BUY' | 'SELL'
+  orderType: string
+  timeInForce: string
+  status: string
+  price: string | null
+  quantity: string
+  orderAmount: string
+  currency: string
+  orderedAt: string
+  canceledAt: string | null
+  execution?: TossOrderExecution
+}
+
+export interface TossOrdersPage {
+  orders: TossOrder[]
+  nextCursor: string | null
+  hasNext: boolean
+}
+
+export interface TossBuyingPower {
+  currency: string
+  cashBuyingPower: string
+}
+
+export interface TossCommission {
+  marketCountry: string
+  commissionRate: string
+  startDate: string | null
+  endDate: string | null
+}
+
+export interface PlaceOrderRequest {
+  symbol: string
+  side: 'BUY' | 'SELL'
+  orderType: 'MARKET' | 'LIMIT'
+  quantity: string
+  price?: string
+}
+
+export interface TossOrderbookLevel {
+  price: string
+  volume: string
+}
+
+export interface TossOrderbook {
+  timestamp: string
+  currency: string
+  asks: TossOrderbookLevel[]
+  bids: TossOrderbookLevel[]
+}
