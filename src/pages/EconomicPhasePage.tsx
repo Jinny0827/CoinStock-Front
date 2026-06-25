@@ -41,7 +41,7 @@ export default function EconomicPhasePage() {
   const tips  = PHASE_STRATEGY[data.phase]
 
   return (
-    <div style={{ padding: '16px', maxWidth: 600, margin: '0 auto' }}>
+    <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: '16px', maxWidth: 600, margin: '0 auto' }}>
       <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>경제 국면 분석</h2>
 
       {/* 국면 배지 */}

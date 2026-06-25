@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTrades, addTrade, deleteTrade } from '../api/stockApi'
+import { getTossAccountStatus } from '../api/tossApi'
+import TossInsightView from '../components/history/TossInsightView'
 import type { Trade } from '../types/stock'
 
 
@@ -11,6 +13,19 @@ const monthAgo = () => {
 }
 
 export default function HistoryPage() {
+    const { data: status } = useQuery({ queryKey: ['toss-status'], queryFn: getTossAccountStatus, refetchOnMount: 'always' })
+    const connected = status?.connected ?? false
+
+    return (
+        <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: '16px', maxWidth: 900, margin: '0 auto' }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>거래 기록</h2>
+            {connected ? <TossInsightView /> : <ManualHistoryView />}
+        </div>
+    )
+}
+
+// 토스 미연동 유저용 — 수기 입력 거래기록 (기존 기능 그대로)
+function ManualHistoryView() {
     const [from, setFrom] = useState(monthAgo());
     const [to, setTo] = useState(today());
     const [showModal, setShowModal] = useState(false);
@@ -37,21 +52,18 @@ export default function HistoryPage() {
     const realized  = totalSell - totalBuy
 
     return (
-        <div style={{ padding: '16px', maxWidth: 900, margin: '0 auto' }}>
+        <div>
 
-            {/* 헤더 */}
-            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
-                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>거래 기록</h2>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <input type="date" value={from} onChange={e => setFrom(e.target.value)}
-                           style={dateInputStyle} />
-                    <span style={{ color: '#4B5675', fontSize: 12 }}>~</span>
-                    <input type="date" value={to} onChange={e => setTo(e.target.value)}
-                           style={dateInputStyle} />
-                    <button onClick={() => setShowModal(true)} style={btnStyle}>
-                        + 거래 추가
-                    </button>
-                </div>
+            {/* 컨트롤 */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+                <input type="date" value={from} onChange={e => setFrom(e.target.value)}
+                       style={dateInputStyle} />
+                <span style={{ color: '#4B5675', fontSize: 12 }}>~</span>
+                <input type="date" value={to} onChange={e => setTo(e.target.value)}
+                       style={dateInputStyle} />
+                <button onClick={() => setShowModal(true)} style={btnStyle}>
+                    + 거래 추가
+                </button>
             </div>
 
             {/* 요약 카드 */}

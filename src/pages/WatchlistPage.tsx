@@ -36,7 +36,7 @@ export default function WatchlistPage() {
     }
 
     return (
-        <div style={{ padding: '16px', maxWidth: 700, margin: '0 auto' }}>
+        <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: '16px', maxWidth: 700, margin: '0 auto' }}>
 
             {/* 헤더 */}
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>

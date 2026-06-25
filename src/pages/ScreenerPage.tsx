@@ -36,7 +36,7 @@ export default function ScreenerPage() {
   }
 
   return (
-    <div style={{ padding: '16px', maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ height: '100%', overflowY: 'auto', boxSizing: 'border-box', padding: '16px', maxWidth: 800, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20, gap: 10 }}>
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>가치주 스크리너</h2>
         {data && (
