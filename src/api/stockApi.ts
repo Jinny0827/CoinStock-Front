@@ -3,7 +3,7 @@ import type {
     StockQuote, FinancialData, OhlcvBar,
     Prediction, PredictionHistoryItem, FearGreed, FxRate, MacroData,
     EconomicPhase, ValueStock,
-    ForceStock, Trade, PortfolioSummary, WatchlistItem, StockNews, MarketSession,
+    ForceStock, Trade, WatchlistItem, StockNews, MarketSession,
 } from '../types/stock'
 
 // ── 시세 ──────────────────────────────────────────────────
@@ -97,10 +97,6 @@ export const addTrade         = (body: Omit<Trade, 'id'>) =>
 
 export const deleteTrade      = (id: number) =>
   client.delete<{ code:string }>(`/api/trades/${id}`).then(r => r.data)
-
-// ── 포트폴리오 ──────────────────────────────────────────────
-export const getPortfolioSummary = () =>
-  client.get<{ code:string } & PortfolioSummary>('/api/portfolio/summary').then(r => r.data)
 
 // ── 관심 종목 ──────────────────────────────────────────────
 export const getWatchlist     = () =>

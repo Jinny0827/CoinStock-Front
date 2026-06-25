@@ -130,26 +130,6 @@ export interface Trade {
   tradedAt:  string
 }
 
-/** /api/portfolio/summary */
-export interface PortfolioSummary {
-  totalPnl:     number
-  winRate:      number
-  totalTrades:  number
-  totalSymbols: number
-  bySymbol:     SymbolSummary[]
-}
-
-export interface SymbolSummary {
-  symbol:        string
-  name:          string
-  netQty:        number
-  avgBuyPrice:   number
-  currentPrice:  number
-  realizedPnl:   number
-  unrealizedPnl: number
-  totalPnl:      number
-}
-
 /** /api/watchlist */
 export interface WatchlistItem {
   symbol:   string

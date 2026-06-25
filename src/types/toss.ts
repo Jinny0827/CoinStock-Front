@@ -135,3 +135,32 @@ export interface TossOrderbook {
   asks: TossOrderbookLevel[]
   bids: TossOrderbookLevel[]
 }
+
+export interface TossInsightSymbol {
+  symbol: string
+  name: string
+  totalBuyAmount: string
+  totalSellAmount: string
+  currentValue: string
+  currentQty: string
+  pnl: string
+}
+
+export interface TossInsightMonth {
+  month: string  // "yyyy-MM"
+  buyAmount: string
+  sellAmount: string
+}
+
+export interface TossInsightCurrency {
+  totalBuyAmount: string
+  totalSellAmount: string
+  currentValue: string
+  totalPnl: string
+  totalTrades: number
+  bySymbol: TossInsightSymbol[]
+  monthly: TossInsightMonth[]
+}
+
+// key: "KRW" | "USD"
+export type TossInsight = Record<string, TossInsightCurrency>

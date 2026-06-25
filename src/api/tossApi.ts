@@ -2,7 +2,7 @@ import client from './client'
 import { unwrap } from './apiUtils'
 import type {
   TossAccountStatus, TossHoldings, TossHoldingsEnvelope, TossWarning, TossPriceLimits,
-  TossOrdersPage, TossBuyingPower, TossCommission, PlaceOrderRequest, TossOrderbook,
+  TossOrdersPage, TossBuyingPower, TossCommission, PlaceOrderRequest, TossOrderbook, TossInsight,
 } from '../types/toss'
 
 export const connectTossAccount = (clientId: string, clientSecret: string) =>
@@ -75,3 +75,12 @@ export const placeTossOrder = (body: PlaceOrderRequest) =>
 export const cancelTossOrder = (orderId: string) =>
   client.post<{ code: string; message?: string }>(`/api/toss/account/orders/${orderId}/cancel`)
     .then(r => unwrap(r.data))
+
+export const getTossInsight = (): Promise<TossInsight> =>
+  client.get<{ code: string; message?: string; data?: TossInsight }>('/api/toss/account/insight', { timeout: 30_000 })
+    .then(r => {
+      if (r.data.code !== '0000' || !r.data.data) {
+        throw new Error(r.data.message ?? '거래 인사이트 조회에 실패했습니다')
+      }
+      return r.data.data
+    })
