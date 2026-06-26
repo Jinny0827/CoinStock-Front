@@ -8,7 +8,6 @@ import {useIsDesktop} from './hooks/useIsDesktop'
 import HomePage from './pages/HomePage'
 import StockAnalysisPage from './pages/StockAnalysisPage'
 import HistoryPage from './pages/HistoryPage'
-import WatchlistPage from './pages/WatchlistPage.tsx'
 import MyPage from './pages/MyPage'
 import EconomicPhasePage from './pages/EconomicPhasePage'
 import ScreenerPage from './pages/ScreenerPage'
@@ -58,7 +57,6 @@ function Layout() {
                     <Route path="/"           element={<HomePage />} />
                     <Route path="/analysis"   element={<StockAnalysisPage />} />
                     <Route path="/history"    element={<RequireAuth><HistoryPage /></RequireAuth>} />
-                    <Route path="/watchlist"  element={<RequireAuth><WatchlistPage /></RequireAuth>} />
                     <Route path="/mypage"     element={<RequireAuth><MyPage /></RequireAuth>} />
                     <Route path="/economic"   element={<EconomicPhasePage />} />
                     <Route path="/screener"   element={<ScreenerPage />} />
