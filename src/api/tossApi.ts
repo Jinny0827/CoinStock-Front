@@ -77,7 +77,7 @@ export const cancelTossOrder = (orderId: string) =>
     .then(r => unwrap(r.data))
 
 export const getTossInsight = (): Promise<TossInsight> =>
-  client.get<{ code: string; message?: string; data?: TossInsight }>('/api/toss/account/insight', { timeout: 30_000 })
+  client.get<{ code: string; message?: string; data?: TossInsight }>('/api/toss/account/insight', { timeout: 60_000 })
     .then(r => {
       if (r.data.code !== '0000' || !r.data.data) {
         throw new Error(r.data.message ?? '거래 인사이트 조회에 실패했습니다')

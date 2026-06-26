@@ -307,6 +307,29 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
             <span>상단 {prediction.targetHigh.toLocaleString()}</span>
           </div>
 
+          {/* 참고한 뉴스 — 분석 근거를 직접 확인할 수 있게 노출 */}
+          {prediction.newsUsed && prediction.newsUsed.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: 10, color: '#4B5675', marginBottom: 6 }}>분석에 참고한 뉴스</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {prediction.newsUsed.map((n, i) => (
+                  <a
+                    key={i} href={n.link} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      fontSize: 11, color: '#8DA2C4', textDecoration: 'none',
+                      display: 'flex', gap: 6, alignItems: 'baseline',
+                    }}
+                  >
+                    <span style={{ flexShrink: 0, color: '#4B5675' }}>·</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {n.title}{n.source && <span style={{ color: '#4B5675' }}> — {n.source}</span>}
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 지표 뱃지 */}
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             {prediction.indicators && [
@@ -497,6 +520,7 @@ function SparkChart({ bars, prediction, history = [] }: {
   const [hov,      setHov]      = useState<{ idx: number; px: number; py: number } | null>(null)
   const [predHov,  setPredHov]  = useState(false)
   const [histHov,  setHistHov]  = useState<{ item: PredictionHistoryItem; px: number; py: number } | null>(null)
+  const [selected, setSelected] = useState<number | null>(null)  // 클릭으로 고정한 구간 — 과거/현재 비교용
   const wrapRef = useRef<HTMLDivElement>(null)
 
   // 날짜 → 바 인덱스 맵 (과거 예측 마커 매칭용)
@@ -612,17 +636,43 @@ function SparkChart({ bars, prediction, history = [] }: {
   }
   const onMouseLeave = () => { setHov(null); setPredHov(false) }
 
+  // 차트 클릭 → 그 구간을 고정해 현재가/이후 실제 흐름과 비교 (같은 점 다시 클릭하면 해제)
+  const onClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const sr  = e.currentTarget.getBoundingClientRect()
+    const svgX = ((e.clientX - sr.left) / sr.width) * W
+    if (svgX > SP) return  // 예측 영역은 비교 대상 아님
+
+    let best = 0, minD = Infinity
+    for (let i = 0; i < bars.length; i++) {
+      const dist = Math.abs(toX(i) - svgX)
+      if (dist < minD) { minD = dist; best = i }
+    }
+    setSelected(prev => prev === best ? null : best)
+  }
+
   const hBar  = hov ? bars[hov.idx] : null
   const wrapW = wrapRef.current?.offsetWidth ?? 300
+
+  // 선택 구간 비교 데이터 — 그날 종가 대비 오늘, 그리고 5/10/20거래일 후 실제 종가
+  const selBar  = selected != null ? bars[selected] : null
+  const lastBar = bars[bars.length - 1]
+  const pctChange = (from: number, to: number) => ((to - from) / from) * 100
+  const horizons = selected != null
+    ? [5, 10, 20].map(n => {
+        const idx = selected + n
+        return { n, bar: idx < bars.length ? bars[idx] : null }
+      })
+    : []
 
   return (
     <div ref={wrapRef} style={{ position: 'relative', margin: '8px -4px 0', userSelect: 'none' }}>
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        style={{ width: '100%', height: 185, display: 'block' }}
+        style={{ width: '100%', height: 185, display: 'block', cursor: 'pointer' }}
         preserveAspectRatio="none"
         onMouseMove={onMouseMove}
         onMouseLeave={onMouseLeave}
+        onClick={onClick}
       >
         <defs>
           <linearGradient id="sg-grad" x1="0" y1="0" x2="0" y2="1">
@@ -728,6 +778,20 @@ function SparkChart({ bars, prediction, history = [] }: {
               stroke="rgba(255,255,255,0.18)" strokeWidth="0.8" />
             <circle cx={toX(hov.idx)} cy={toY(hBar.close)} r="3"
               fill={priceCol} stroke="rgba(0,0,0,0.6)" strokeWidth="1.2" />
+          </g>
+        )}
+
+        {/* 클릭으로 고정한 구간 — 기준점 + 이후 5/10/20거래일 지점 */}
+        {selBar && selected != null && (
+          <g>
+            <line x1={toX(selected)} y1={PAD_T/2} x2={toX(selected)} y2={HP}
+              stroke="#A66BFF" strokeWidth="1" strokeDasharray="2,2" opacity="0.7" />
+            <circle cx={toX(selected)} cy={toY(selBar.close)} r="4"
+              fill="#A66BFF" stroke="#080C17" strokeWidth="1.2" />
+            {horizons.filter(h => h.bar).map(h => (
+              <circle key={h.n} cx={toX(selected + h.n)} cy={toY(h.bar!.close)} r="2.5"
+                fill="none" stroke="#A66BFF" strokeWidth="1.2" opacity="0.8" />
+            ))}
           </g>
         )}
       </svg>
@@ -870,6 +934,57 @@ function SparkChart({ bars, prediction, history = [] }: {
         </div>
       )}
 
+      {/* 클릭으로 고정한 구간 비교 카드 — 그날 대비 오늘, 이후 실제 흐름 */}
+      {selBar && selected != null && (
+        <div style={{
+          margin: '8px 4px 0',
+          background: 'rgba(166,107,255,0.06)',
+          border: '1px solid rgba(166,107,255,0.25)',
+          borderRadius: 8, padding: '10px 12px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontSize: 10, color: '#A66BFF', fontWeight: 700 }}>
+              {new Date(selBar.timestamp * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })} 구간 비교
+            </span>
+            <span
+              onClick={() => setSelected(null)}
+              style={{ marginLeft: 'auto', fontSize: 11, color: '#4B5675', cursor: 'pointer' }}
+            >닫기 ×</span>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }}>
+            <span style={{ color: '#8892A8' }}>그날 종가 {selBar.close.toLocaleString()} → 오늘 {lastBar.close.toLocaleString()}</span>
+            <span style={{
+              fontWeight: 700,
+              color: lastBar.close >= selBar.close ? '#FF8C00' : '#FF4B4B',
+            }}>
+              {pctChange(selBar.close, lastBar.close) >= 0 ? '+' : ''}{pctChange(selBar.close, lastBar.close).toFixed(1)}%
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            {horizons.map(h => (
+              <div key={h.n} style={{ flex: 1, textAlign: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: 6, padding: '6px 4px' }}>
+                <div style={{ fontSize: 9, color: '#4B5675', marginBottom: 3 }}>{h.n}거래일 후</div>
+                {h.bar ? (
+                  <>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#C9D1E0' }}>{h.bar.close.toLocaleString()}</div>
+                    <div style={{
+                      fontSize: 10, fontWeight: 700,
+                      color: h.bar.close >= selBar.close ? '#FF8C00' : '#FF4B4B',
+                    }}>
+                      {pctChange(selBar.close, h.bar.close) >= 0 ? '+' : ''}{pctChange(selBar.close, h.bar.close).toFixed(1)}%
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 10, color: '#3A4258' }}>아직 안 지남</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 범례 */}
       <div style={{
         display: 'flex', gap: 10, padding: '3px 4px 0',
@@ -880,6 +995,7 @@ function SparkChart({ bars, prediction, history = [] }: {
         <span style={{ color: '#3D8EFF' }}>— MA20</span>
         {prediction && <span style={{ color: predCol }}>┄ AI 예측</span>}
         {histMarkers.length > 0 && <span style={{ color: '#8892A8' }}>● 과거 예측</span>}
+        <span style={{ color: '#A66BFF', marginLeft: 'auto' }}>클릭해서 구간 비교</span>
       </div>
     </div>
   )

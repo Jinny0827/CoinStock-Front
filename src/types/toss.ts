@@ -158,6 +158,9 @@ export interface TossInsightCurrency {
   currentValue: string
   totalPnl: string
   totalTrades: number
+  winCount: number
+  lossCount: number
+  winRate: string  // "0"~"100" 문자열 (소수점 1자리) — 완전히 매칭된 매도만 집계, 결정된 거래 없으면 "0"
   bySymbol: TossInsightSymbol[]
   monthly: TossInsightMonth[]
 }
