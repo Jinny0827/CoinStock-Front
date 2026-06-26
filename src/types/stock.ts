@@ -54,6 +54,7 @@ export interface Prediction {
   reason:             string
   detail?:            string
   companyDescription?: string
+  newsUsed?: { title: string; link: string; source: string; published_at: string }[]
   indicators: {
     ma5:      number
     ma20:     number
