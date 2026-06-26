@@ -132,9 +132,13 @@ export interface Trade {
 
 /** /api/watchlist */
 export interface WatchlistItem {
-  symbol:   string
-  name:     string
-  addedAt:  string
+  symbol:         string
+  name:           string
+  addedAt:        string
+  price?:         number   // 백엔드가 StockDataStore에서 현재가 조인해서 내려줌 (없으면 추적 풀 밖 종목)
+  changePercent?: number
+  volume?:        number
+  score?:         number
 }
 
 /** /api/news/{symbol} — 공시 항목 (DART) */

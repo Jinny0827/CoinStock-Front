@@ -1,26 +1,33 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
-import {addWatchlist, deleteWatchlist, getForceStocks, getKrPennyStocks, getUsPennyStocks, isWatched} from '../../api/stockApi'
+import {addWatchlist, deleteWatchlist, getForceStocks, getKrPennyStocks, getUsPennyStocks, getWatchlist, isWatched} from '../../api/stockApi'
 import { useStockStore } from '../../store/stockStore'
-import type { StockQuote } from '../../types/stock'
+import { useAuthStore } from '../../store/authStore'
+import type { StockQuote, WatchlistItem } from '../../types/stock'
 
-type TabType = '세력감지' | '국장' | '미장'
+type TabType = '세력감지' | '국장' | '미장' | '관심종목'
+type RowStock = Pick<StockQuote, 'symbol' | 'name' | 'price' | 'changePercent' | 'volume' | 'score'>
 
-const TABS: TabType[] = ['세력감지', '국장', '미장']
+const TABS: TabType[] = ['세력감지', '국장', '미장', '관심종목']
 
 const dedup = <T extends { symbol: string }>(data: T[]): T[] =>
   [...new Map(data.map(s => [s.symbol, s])).values()]
 
-const THEME_MAP: Record<string, string> = {
-  '005930.KS': '반도체', '000660.KS': '반도체', '035420.KS': 'IT',
-  '035720.KS': 'IT',     '051910.KS': '2차전지', '006400.KS': '2차전지',
-  'AAPL': '빅테크', 'MSFT': '빅테크', 'NVDA': 'AI반도체',
-}
+const toRowStock = (w: WatchlistItem): RowStock => ({
+  symbol: w.symbol,
+  name: w.name,
+  price: w.price ?? 0,
+  changePercent: w.changePercent ?? 0,
+  volume: w.volume ?? 0,
+  score: w.score,
+})
 
 export default function HotStockList() {
   const [tab,       setTab]       = useState<TabType>('세력감지')
   const [dirFilter, setDirFilter] = useState<'all' | 'up' | 'down'>('all')
+  const [showAddModal, setShowAddModal] = useState(false)
   const { selectedSymbol, setSelectedSymbol, setSelectedStock } = useStockStore()
+  const token = useAuthStore(s => s.token)
   const qc = useQueryClient()
 
   const handleTabChange = useCallback((newTab: TabType) => {
@@ -53,13 +60,28 @@ export default function HotStockList() {
     select: dedup,
   })
 
-  const listMap: Record<TabType, StockQuote[]> = {
+  const { data: watchlistData = [], isLoading: watchlistLoading } = useQuery({
+    queryKey: ['watchlist'],
+    queryFn: getWatchlist,
+    enabled: tab === '관심종목' && !!token,
+  })
+
+  const addMut = useMutation({
+    mutationFn: ({ symbol, name }: { symbol: string; name: string }) => addWatchlist(symbol, name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['watchlist'] })
+      setShowAddModal(false)
+    },
+  })
+
+  const listMap: Record<TabType, RowStock[]> = {
     '세력감지': forceData,
     '국장':     krData,
     '미장':     usData,
+    '관심종목': watchlistData.map(toRowStock),
   }
 
-  // 세력감지: 등락률 절댓값 내림차순 / 국장·미장: 서버 score 순 유지
+  // 세력감지: 등락률 절댓값 내림차순 / 그 외: 서버 score 순(또는 추가일 순) 유지
   const list = (() => {
     const base = (tab === '세력감지'
       ? listMap['세력감지'].slice().sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
@@ -120,13 +142,20 @@ export default function HotStockList() {
         ))}
       </div>
 
-      {/* 전체/상승/하락 필터 */}
+      {/* 전체/상승/하락 필터 (+ 관심종목 탭에서는 종목 추가 버튼) */}
       <div style={{
-        display: 'flex', justifyContent: 'flex-end', gap: 4,
+        display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4,
         padding: '6px 20px',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
         flexShrink: 0,
       }}>
+        {tab === '관심종목' && token && (
+          <button onClick={() => setShowAddModal(true)} style={{
+            fontSize: 10, padding: '2px 9px', borderRadius: 4, cursor: 'pointer',
+            border: '1px solid rgba(255,140,0,0.4)', background: 'rgba(255,140,0,0.08)',
+            color: '#FF8C00', marginRight: 'auto',
+          }}>+ 종목 추가</button>
+        )}
         {(['all', 'up', 'down'] as const).map(d => (
           <button
             key={d}
@@ -143,10 +172,12 @@ export default function HotStockList() {
 
       {/* 리스트 */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {list.length === 0 ? (
+        {tab === '관심종목' && !token ? (
+          <EmptyState tab={tab} loginRequired />
+        ) : list.length === 0 ? (
           <EmptyState
             tab={tab}
-            loading={(tab === '국장' && krLoading) || (tab === '미장' && usLoading)}
+            loading={(tab === '국장' && krLoading) || (tab === '미장' && usLoading) || (tab === '관심종목' && watchlistLoading)}
           />
         ) : (
           list.map((stock, i) => (
@@ -154,30 +185,35 @@ export default function HotStockList() {
               key={stock.symbol}
               rank={i + 1}
               stock={stock}
-              theme={THEME_MAP[stock.symbol]}
               maxVol={maxVol}
               selected={selectedSymbol === stock.symbol}
-              onClick={() => { setSelectedSymbol(stock.symbol); setSelectedStock(stock) }}
-              showScore={tab === '국장' || tab === '미장'}
+              // StockDetailPanel은 selectedStock에서 price/name만 읽고 나머진 symbol로 직접 재조회하므로 RowStock으로도 안전
+              onClick={() => { setSelectedSymbol(stock.symbol); setSelectedStock(stock as StockQuote) }}
             />
           ))
         )}
       </div>
+
+      {showAddModal && (
+        <AddModal
+          onClose={() => setShowAddModal(false)}
+          onSubmit={(symbol, name) => addMut.mutate({ symbol, name })}
+          loading={addMut.isPending}
+        />
+      )}
     </div>
   )
 }
 
 // ── 종목 행 ────────────────────────────────────────────────
 function StockRow({
-                      rank, stock, theme, maxVol, selected, onClick, showScore,
+                      rank, stock, maxVol, selected, onClick,
                   }: {
     rank: number
-    stock: StockQuote
-    theme?: string
+    stock: RowStock
     maxVol: number
     selected: boolean
     onClick: () => void
-    showScore?: boolean
 }) {
     const up = stock.changePercent >= 0
     const volRatio = Math.round(stock.volume / maxVol * 100)
@@ -226,19 +262,13 @@ function StockRow({
                     </div>
                     <div style={{ fontSize: 10, color: '#4B5675', display: 'flex', alignItems: 'center', gap: 5 }}>
                         {stock.symbol}
-                        {showScore && stock.score != null && stock.score > 0 && (
+                        {stock.score != null && stock.score > 0 && (
                             <span style={{
                                 background: stock.score >= 70
                                     ? 'rgba(255,140,0,0.15)' : 'rgba(61,142,255,0.12)',
                                 color: stock.score >= 70 ? '#FF8C00' : '#3D8EFF',
                                 fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
                             }}>{stock.score}점</span>
-                        )}
-                        {!showScore && theme && (
-                            <span style={{
-                                background: 'rgba(61,142,255,0.12)', color: '#3D8EFF',
-                                fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 600,
-                            }}>{theme}</span>
                         )}
                     </div>
                 </div>
@@ -303,7 +333,20 @@ function LiveDot() {
   )
 }
 
-function EmptyState({ tab, loading }: { tab: TabType; loading?: boolean }) {
+function EmptyState({ tab, loading, loginRequired }: { tab: TabType; loading?: boolean; loginRequired?: boolean }) {
+  if (loginRequired) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        height: 200, gap: 8,
+      }}>
+        <div style={{ fontSize: 22 }}>★</div>
+        <div style={{ fontSize: 12, color: '#4B5675' }}>로그인 후 이용할 수 있습니다</div>
+      </div>
+    )
+  }
+
   // 탭 전환 직후 API 응답 대기 중 — "수집 중" 메시지 대신 스피너
   if (loading) {
     return (
@@ -323,12 +366,14 @@ function EmptyState({ tab, loading }: { tab: TabType; loading?: boolean }) {
     )
   }
 
-  const icon    = tab === '세력감지' ? '🔍' : '💰'
+  const icon    = tab === '세력감지' ? '🔍' : tab === '관심종목' ? '★' : '💰'
   const message = tab === '세력감지'
     ? '감지된 세력 종목 없음'
-    : tab === '국장'
-      ? '국장 동전주 수집 중… (DB 없을 시 첫 실행 약 20분)'
-      : '미장 동전주 수집 중… (DB 없을 시 첫 실행 약 30초)'
+    : tab === '관심종목'
+      ? '관심 종목이 없습니다'
+      : tab === '국장'
+        ? '국장 동전주 수집 중… (DB 없을 시 첫 실행 약 20분)'
+        : '미장 동전주 수집 중… (DB 없을 시 첫 실행 약 30초)'
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -339,4 +384,77 @@ function EmptyState({ tab, loading }: { tab: TabType; loading?: boolean }) {
       <div style={{ fontSize: 12, color: '#4B5675' }}>{message}</div>
     </div>
   )
+}
+
+// ── 관심 종목 수동 추가 모달 ──────────────────────────────────
+function AddModal({ onClose, onSubmit, loading }: {
+    onClose: () => void
+    onSubmit: (symbol: string, name: string) => void
+    loading: boolean
+}) {
+    const [symbol, setSymbol] = useState('')
+    const [name,   setName]   = useState('')
+
+    return (
+        <div style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1000,
+        }} onClick={onClose}>
+            <div style={{
+                background: '#0E1525', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 10, padding: 24, width: 'min(360px, calc(100vw - 24px))',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+            }} onClick={e => e.stopPropagation()}>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>관심 종목 추가</div>
+
+                <div style={{ marginBottom: 12 }}>
+                    <label style={labelStyle}>종목코드</label>
+                    <input
+                        value={symbol} onChange={e => setSymbol(e.target.value)}
+                        placeholder="005930.KS"
+                        style={inputStyle}
+                        autoFocus
+                    />
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                    <label style={labelStyle}>종목명</label>
+                    <input
+                        value={name} onChange={e => setName(e.target.value)}
+                        placeholder="삼성전자"
+                        style={inputStyle}
+                    />
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={onClose} style={{ ...modalBtnStyle, background: 'transparent', flex: 1 }}>
+                        취소
+                    </button>
+                    <button
+                        onClick={() => { if (symbol && name) onSubmit(symbol.trim(), name.trim()) }}
+                        disabled={loading || !symbol || !name}
+                        style={{ ...modalBtnStyle, flex: 2, opacity: (!symbol || !name) ? 0.5 : 1 }}
+                    >
+                        {loading ? '추가 중...' : '추가'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+const modalBtnStyle: React.CSSProperties = {
+    padding: '8px 16px', borderRadius: 6,
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,140,0,0.1)', color: '#FF8C00',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+}
+const labelStyle: React.CSSProperties = {
+    fontSize: 10, color: '#4B5675', display: 'block', marginBottom: 4,
+}
+const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '8px 10px', borderRadius: 6, fontSize: 13,
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#E2E8F0', outline: 'none', boxSizing: 'border-box',
 }

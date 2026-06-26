@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getTossInsight } from '../../api/tossApi'
+import { getAllStocks } from '../../api/stockApi'
 import type { TossInsightCurrency, TossInsightMonth, TossInsightSymbol } from '../../types/toss'
 
 const num = (v?: string) => Number(v ?? 0) || 0
@@ -16,6 +17,11 @@ export default function TossInsightView() {
     staleTime: 60_000,
   })
   const [activeCurrency, setActiveCurrency] = useState<string | null>(null)
+
+  // 인사이트는 holdings(현재 보유 중)에서만 이름을 채우다 보니 이미 다 판 종목은 이름이 비어 코드로 나옴 — 전체 종목 목록에서 보강
+  const { data: allStocks = [] } = useQuery({ queryKey: ['stocks-all'], queryFn: getAllStocks, staleTime: 30_000 })
+  const nameOf = (symbol: string, fallback: string) =>
+    allStocks.find(s => s.symbol.replace(/\.(KS|KQ)$/, '') === symbol)?.name ?? fallback
 
   if (isLoading) return <Dim>거래 인사이트 불러오는 중...</Dim>
   if (isError) return <div style={errorStyle}>{(error as Error)?.message ?? '인사이트를 불러오지 못했습니다'}</div>
@@ -40,7 +46,7 @@ export default function TossInsightView() {
           ))}
         </div>
       )}
-      <CurrencySection currency={activeTab} data={activeData} />
+      <CurrencySection currency={activeTab} data={activeData} nameOf={nameOf} />
     </div>
   )
 }
@@ -57,7 +63,9 @@ function Tab({ label, active, onClick }: { label: string; active: boolean; onCli
   )
 }
 
-function CurrencySection({ currency, data }: { currency: string; data: TossInsightCurrency }) {
+function CurrencySection({ currency, data, nameOf }: {
+  currency: string; data: TossInsightCurrency; nameOf: (symbol: string, fallback: string) => string
+}) {
   const totalPnl = num(data.totalPnl)
 
   return (
@@ -71,7 +79,7 @@ function CurrencySection({ currency, data }: { currency: string; data: TossInsig
 
       {data.monthly.length > 0 && <MonthlyChart monthly={data.monthly} currency={currency} />}
 
-      <SymbolTable symbols={data.bySymbol} currency={currency} />
+      <SymbolTable symbols={data.bySymbol} currency={currency} nameOf={nameOf} />
     </div>
   )
 }
@@ -125,7 +133,9 @@ function FixedTooltip({ x, y, text }: { x: number; y: number; text: string }) {
   )
 }
 
-function SymbolTable({ symbols, currency }: { symbols: TossInsightSymbol[]; currency: string }) {
+function SymbolTable({ symbols, currency, nameOf }: {
+  symbols: TossInsightSymbol[]; currency: string; nameOf: (symbol: string, fallback: string) => string
+}) {
   if (symbols.length === 0) return null
 
   return (
@@ -144,7 +154,7 @@ function SymbolTable({ symbols, currency }: { symbols: TossInsightSymbol[]; curr
           return (
             <div key={s.symbol} style={{ ...rowStyle, borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: 13, padding: '10px 16px' }}>
               <div>
-                <div style={{ fontWeight: 600 }}>{s.name}</div>
+                <div style={{ fontWeight: 600 }}>{nameOf(s.symbol, s.name)}</div>
                 <div style={{ fontSize: 10, color: '#4B5675', marginTop: 2 }}>{s.symbol}</div>
               </div>
               <span style={{ textAlign: 'right' }}>{num(s.currentQty).toLocaleString()}주</span>

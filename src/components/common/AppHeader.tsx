@@ -7,6 +7,7 @@ import { useStockStore } from '../../store/stockStore'
 import { useAuthStore } from '../../store/authStore'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import MarketSessionBadge from './MarketSessionBadge'
+import coinLogo from '../../assets/coin-logo.svg'
 import type { StockQuote } from '../../types/stock'
 
 export default function AppHeader() {
@@ -84,10 +85,7 @@ export default function AppHeader() {
           onClick={() => navigate('/')}
           style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer' }}
         >
-          <div style={{
-            width:7, height:7, borderRadius:'50%',
-            background:'#FF8C00', boxShadow:'0 0 6px #FF8C00',
-          }} />
+          <img src={coinLogo} width={34} height={34} alt="" style={{ flexShrink:0 }} />
           <span style={{ fontSize:15, fontWeight:700, letterSpacing:'-0.5px' }}>동전주 도파민</span>
         </div>
 

@@ -4,7 +4,6 @@ const NAV_ITEMS = [
     { label: '홈',      path: '/',          icon: '⊞' },
     { label: '종목분석', path: '/analysis',  icon: '▦' },
     { label: '거래기록', path: '/history',   icon: '₩' },
-    { label: '관심종목', path: '/watchlist', icon: '★' },
     { label: '마이',    path: '/mypage',    icon: '◉' },
 ]
 
