@@ -1,6 +1,7 @@
 import TossAccountSection from '../components/mypage/TossAccountSection'
 import TotpSetupSection from '../components/mypage/TotpSetupSection'
 import TossOrderSection from '../components/mypage/TossOrderSection'
+import NotificationSection from '../components/mypage/NotificationSection'
 
 export default function MyPage() {
     return (
@@ -10,6 +11,7 @@ export default function MyPage() {
             <TossAccountSection />
             <TotpSetupSection />
             <TossOrderSection />
+            <NotificationSection />
         </div>
     )
 }

@@ -6,7 +6,7 @@ import { useAuthStore } from '../../store/authStore'
 import type { StockQuote, WatchlistItem } from '../../types/stock'
 
 type TabType = '세력감지' | '국장' | '미장' | '관심종목'
-type RowStock = Pick<StockQuote, 'symbol' | 'name' | 'price' | 'changePercent' | 'volume' | 'score'>
+type RowStock = Pick<StockQuote, 'symbol' | 'name' | 'price' | 'changePercent' | 'volume' | 'score' | 'forceScore'>
 
 const TABS: TabType[] = ['세력감지', '국장', '미장', '관심종목']
 
@@ -26,6 +26,7 @@ export default function HotStockList() {
   const [tab,       setTab]       = useState<TabType>('세력감지')
   const [dirFilter, setDirFilter] = useState<'all' | 'up' | 'down'>('all')
   const [showAddModal, setShowAddModal] = useState(false)
+  const [scoreTooltip, setScoreTooltip] = useState(false)
   const { selectedSymbol, setSelectedSymbol, setSelectedStock } = useStockStore()
   const token = useAuthStore(s => s.token)
   const qc = useQueryClient()
@@ -81,10 +82,10 @@ export default function HotStockList() {
     '관심종목': watchlistData.map(toRowStock),
   }
 
-  // 세력감지: 등락률 절댓값 내림차순 / 그 외: 서버 score 순(또는 추가일 순) 유지
+  // 세력감지: forceScore 내림차순 / 그 외: 서버 score 순(또는 추가일 순) 유지
   const list = (() => {
     const base = (tab === '세력감지'
-      ? listMap['세력감지'].slice().sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent))
+      ? listMap['세력감지'].slice().sort((a, b) => (b.forceScore ?? 0) - (a.forceScore ?? 0))
       : listMap[tab].slice()
     )
     const dir = dirFilter === 'up'   ? base.filter(s => s.changePercent > 0)
@@ -119,7 +120,46 @@ export default function HotStockList() {
         flexShrink: 0,
       }}>
         <LiveDot />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>동전주 도파민 · 세력 감지</span>
+        <div
+          style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4 }}
+          onMouseEnter={() => setScoreTooltip(true)}
+          onMouseLeave={() => setScoreTooltip(false)}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600 }}>동전주 도파민 · 세력 감지</span>
+          <span style={{ fontSize: 10, color: '#4B5675', cursor: 'default' }}>ⓘ</span>
+          {scoreTooltip && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, zIndex: 200,
+              background: '#0F1623', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8, padding: '12px 14px',
+              minWidth: 240, boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              pointerEvents: 'none', marginTop: 6,
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#E2E8F0', marginBottom: 8 }}>
+                세력감지 점수 계산식 (100점 만점)
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {[
+                  { label: '거래량 폭발', pts: '50점', desc: '10일 평균 대비 거래량 배수' },
+                  { label: '거래대금',    pts: '30점', desc: '가격 × 거래량 실제 자금 규모' },
+                  { label: '저점 반등',   pts: '20점', desc: '52주 저점 대비 현재 위치' },
+                ].map(row => (
+                  <div key={row.label} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 10, color: '#FF8C00', fontWeight: 700, width: 56, flexShrink: 0 }}>{row.pts}</span>
+                    <span style={{ fontSize: 10, color: '#8892A8' }}>{row.label} — {row.desc}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{
+                marginTop: 9, paddingTop: 8,
+                borderTop: '1px solid rgba(255,255,255,0.07)',
+                fontSize: 10, color: '#4B5675', lineHeight: 1.5,
+              }}>
+                거래량 폭발 + 가격 횡보 = 매집 패턴 우선 감지
+              </div>
+            </div>
+          )}
+        </div>
         <span style={{ fontSize: 11, color: '#4B5675', marginLeft: 'auto' }}>
           실시간 · KST
         </span>
@@ -186,6 +226,7 @@ export default function HotStockList() {
               rank={i + 1}
               stock={stock}
               maxVol={maxVol}
+              isForce={tab === '세력감지'}
               selected={selectedSymbol === stock.symbol}
               // StockDetailPanel은 selectedStock에서 price/name만 읽고 나머진 symbol로 직접 재조회하므로 RowStock으로도 안전
               onClick={() => { setSelectedSymbol(stock.symbol); setSelectedStock(stock as StockQuote) }}
@@ -207,11 +248,12 @@ export default function HotStockList() {
 
 // ── 종목 행 ────────────────────────────────────────────────
 function StockRow({
-                      rank, stock, maxVol, selected, onClick,
+                      rank, stock, maxVol, isForce, selected, onClick,
                   }: {
     rank: number
     stock: RowStock
     maxVol: number
+    isForce: boolean
     selected: boolean
     onClick: () => void
 }) {
@@ -262,13 +304,24 @@ function StockRow({
                     </div>
                     <div style={{ fontSize: 10, color: '#4B5675', display: 'flex', alignItems: 'center', gap: 5 }}>
                         {stock.symbol}
-                        {stock.score != null && stock.score > 0 && (
-                            <span style={{
-                                background: stock.score >= 70
-                                    ? 'rgba(255,140,0,0.15)' : 'rgba(61,142,255,0.12)',
-                                color: stock.score >= 70 ? '#FF8C00' : '#3D8EFF',
-                                fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
-                            }}>{stock.score}점</span>
+                        {isForce ? (
+                            stock.forceScore != null && stock.forceScore > 0 && (
+                                <span style={{
+                                    background: stock.forceScore >= 70
+                                        ? 'rgba(168,85,247,0.18)' : 'rgba(168,85,247,0.09)',
+                                    color: stock.forceScore >= 70 ? '#C084FC' : '#A855F7',
+                                    fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
+                                }}>{stock.forceScore}점</span>
+                            )
+                        ) : (
+                            stock.score != null && stock.score > 0 && (
+                                <span style={{
+                                    background: stock.score >= 70
+                                        ? 'rgba(255,140,0,0.15)' : 'rgba(61,142,255,0.12)',
+                                    color: stock.score >= 70 ? '#FF8C00' : '#3D8EFF',
+                                    fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
+                                }}>{stock.score}점</span>
+                            )
                         )}
                     </div>
                 </div>

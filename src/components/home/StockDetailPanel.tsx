@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useStockStore } from '../../store/stockStore'
+import { useAuthStore } from '../../store/authStore'
 import { getFinancial, getOhlcv, getPredict, getPredictHistory, getStockNews } from '../../api/stockApi'
 import TradingStatusBadges from './TradingStatusBadges'
 import StockOrderEntry from './StockOrderEntry'
+import AlertModal from './AlertModal'
 import type { OhlcvBar, StockQuote, DisclosureItem, NewsItem, Prediction, PredictionHistoryItem } from '../../types/stock'
 
 interface Props {
@@ -66,7 +68,9 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
   const storeStock  = useStockStore(s => s.selectedStock)
   const symbol        = propSymbol ?? storeSymbol
   const selectedStock = propStock !== undefined ? propStock : storeStock
-  const [detailOpen, setDetailOpen] = useState(false)
+  const user          = useAuthStore(s => s.user)
+  const [detailOpen,     setDetailOpen]     = useState(false)
+  const [showAlertModal, setShowAlertModal] = useState(false)
 
   // 가격 기반 동전주 자동 판별 — isPenny prop 없이도 세력감지 탭 등에서 동작
   const isKrSymbol    = symbol.endsWith('.KS') || symbol.endsWith('.KQ')
@@ -128,8 +132,34 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
 
       {/* 종목 헤더 */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 2 }}>
-          {displayName}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>{displayName}</div>
+          {user && (
+            <button
+              onClick={() => setShowAlertModal(true)}
+              title="알림 설정"
+              style={{
+                width: 28, height: 28, borderRadius: 6, flexShrink: 0,
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'transparent', color: '#8892A8',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.color = '#FF8C00'
+                e.currentTarget.style.borderColor = 'rgba(255,140,0,0.4)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.color = '#8892A8'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+            </button>
+          )}
         </div>
         <div style={{ fontSize: 11, color: '#4B5675', marginBottom: 12 }}>{symbol}</div>
 
@@ -152,6 +182,15 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
 
         <StockOrderEntry symbol={symbol} name={displayName} currentPrice={currentPrice} />
       </div>
+
+      {showAlertModal && (
+        <AlertModal
+          symbol={symbol}
+          name={displayName}
+          currentPrice={currentPrice}
+          onClose={() => setShowAlertModal(false)}
+        />
+      )}
 
       {/* 회사 소개 */}
       {prediction?.companyDescription && (
@@ -178,9 +217,9 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
       {/* 스파크라인 차트 + 예측 밴드 + 과거 예측 마커 */}
       {bars.length > 1 && <SparkChart bars={bars} prediction={prediction} history={predictHistory} />}
 
-      {/* ── 동전주: 급등 가능성 점수 분석 (가격 기반 자동 판별 포함) ── */}
+      {/* ── 동전주: 급등 가능성 / 세력감지 점수 탭 ── */}
       {showPennyPanel && selectedStock ? (
-        <PennyScorePanel stock={selectedStock} />
+        <ScoreTabPanel stock={selectedStock} />
       ) : (
         /* ── 주요 종목: EPS/PER/PBR/매출성장 ── */
         <div style={{
@@ -363,6 +402,178 @@ export default function StockDetailPanel({ isPenny = false, symbol: propSymbol, 
   )
 }
 
+// ── 점수 탭 래퍼 ──────────────────────────────────────────────
+function ScoreTabPanel({ stock }: { stock: StockQuote }) {
+  const [active, setActive] = useState<'penny' | 'force'>('penny')
+  const [helpVisible, setHelpVisible] = useState(false)
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginBottom: 10 }}>
+        {([
+          { key: 'penny', label: '급등 가능성' },
+          { key: 'force', label: '세력감지' },
+        ] as const).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActive(t.key)}
+            style={{
+              fontSize: 11, fontWeight: 600, padding: '4px 12px',
+              borderRadius: 5, cursor: 'pointer', border: 'none',
+              background: active === t.key
+                ? (t.key === 'force' ? 'rgba(168,85,247,0.18)' : 'rgba(255,140,0,0.12)')
+                : 'rgba(255,255,255,0.04)',
+              color: active === t.key
+                ? (t.key === 'force' ? '#C084FC' : '#FF8C00')
+                : '#4B5675',
+              transition: 'all 0.12s',
+            }}
+          >{t.label}</button>
+        ))}
+
+        {/* 도움말 뱃지 */}
+        <div
+          style={{ position: 'relative', marginLeft: 4 }}
+          onMouseEnter={() => setHelpVisible(true)}
+          onMouseLeave={() => setHelpVisible(false)}
+        >
+          <div style={{
+            width: 16, height: 16, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.07)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'default', fontSize: 10, color: '#4B5675', fontWeight: 700,
+          }}>?</div>
+
+          {helpVisible && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0,
+              marginTop: 6, zIndex: 300,
+              background: '#0F1623', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 8, padding: '12px 14px',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)', pointerEvents: 'none',
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {[
+                  { label: '급등 가능성', color: '#FF8C00', desc: '지금 당장 오를 가능성 (가격 모멘텀 포함)', formula: '거래량 폭발 40 · 가격 모멘텀 25 · 저점 반등 20 · 거래대금 15' },
+                  { label: '세력감지',    color: '#C084FC', desc: '매집 패턴 감지 (가격 등락 무관)',           formula: '거래량 폭발 50 · 거래대금 30 · 저점 반등 20' },
+                ].map(row => (
+                  <div key={row.label} style={{ display: 'flex', alignItems: 'baseline', gap: 6, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: row.color, flexShrink: 0 }}>{row.label}</span>
+                    <span style={{ fontSize: 10, color: '#8892A8' }}>{row.desc}</span>
+                    <span style={{ fontSize: 10, color: '#4B5675' }}>{row.formula}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      {active === 'penny' ? <PennyScorePanel stock={stock} /> : <ForceScorePanel stock={stock} />}
+    </div>
+  )
+}
+
+// ── 세력감지 점수 패널 (ForceEvaluator 동일 로직) ─────────────
+function ForceScorePanel({ stock }: { stock: StockQuote }) {
+  const isKr = stock.symbol.endsWith('.KS') || stock.symbol.endsWith('.KQ')
+
+  // 1. 거래량 폭발 (max 50)
+  const avg10 = stock.avgVolume10Day
+  let volScore = 0
+  let volLabel = '-'
+  if (avg10 > 0) {
+    const ratio = stock.volume / avg10
+    volLabel = `${ratio.toFixed(1)}x`
+    if      (ratio >= 10) volScore = 50
+    else if (ratio >=  5) volScore = 38
+    else if (ratio >=  3) volScore = 25
+    else if (ratio >=  2) volScore = 15
+    else if (ratio >=  1.5) volScore = 7
+  } else if (stock.volume > 0) {
+    const thr = isKr ? 50_000 : 100_000
+    if      (stock.volume >= thr * 10) { volScore = 18; volLabel = '대량' }
+    else if (stock.volume >= thr * 3)  { volScore = 10; volLabel = '중량' }
+    else if (stock.volume >= thr)      { volScore =  4; volLabel = '소량' }
+  }
+
+  // 2. 거래대금 (max 30)
+  const tvRaw = stock.price * stock.volume
+  let tvScore = 0
+  let tvLabel = '-'
+  if (isKr) {
+    if      (tvRaw >= 1_000_000_000) { tvScore = 30; tvLabel = (tvRaw / 100_000_000).toFixed(0) + '억' }
+    else if (tvRaw >=   500_000_000) { tvScore = 22; tvLabel = (tvRaw / 100_000_000).toFixed(1) + '억' }
+    else if (tvRaw >=   100_000_000) { tvScore = 14; tvLabel = (tvRaw / 100_000_000).toFixed(1) + '억' }
+    else if (tvRaw >=    50_000_000) { tvScore =  7; tvLabel = (tvRaw / 100_000_000).toFixed(2) + '억' }
+    else                             {               tvLabel = (tvRaw / 100_000_000).toFixed(2) + '억' }
+  } else {
+    if      (tvRaw >= 2_000_000) { tvScore = 30; tvLabel = '$' + (tvRaw / 1_000_000).toFixed(1) + 'M' }
+    else if (tvRaw >= 1_000_000) { tvScore = 22; tvLabel = '$' + (tvRaw / 1_000_000).toFixed(2) + 'M' }
+    else if (tvRaw >=   500_000) { tvScore = 14; tvLabel = '$' + (tvRaw / 1_000_000).toFixed(2) + 'M' }
+    else if (tvRaw >=   100_000) { tvScore =  7; tvLabel = '$' + (tvRaw / 1_000).toFixed(0) + 'K'     }
+    else                         {               tvLabel = '$' + (tvRaw / 1_000).toFixed(0) + 'K'     }
+  }
+
+  // 3. 저점 반등 (max 20)
+  const low52 = stock.low52Week
+  let lowScore = 0
+  let fromLowPct = 0
+  if (low52 > 0 && stock.price > 0) {
+    const fromLow = stock.price / low52
+    fromLowPct = (fromLow - 1) * 100
+    if      (fromLow <= 1.05) lowScore = 20
+    else if (fromLow <= 1.10) lowScore = 15
+    else if (fromLow <= 1.20) lowScore = 10
+    else if (fromLow <= 1.35) lowScore =  5
+  }
+
+  const totalScore = Math.min(volScore + tvScore + lowScore, 100)
+
+  const items = [
+    { label: '거래량 폭발', score: volScore, max: 50, sub: volLabel,  color: '#A855F7' },
+    { label: '거래대금',    score: tvScore,  max: 30, sub: tvLabel,   color: '#C084FC' },
+    { label: '저점 반등',   score: lowScore, max: 20, sub: low52 > 0 ? `+${fromLowPct.toFixed(1)}%` : '-', color: '#E879F9' },
+  ]
+
+  return (
+    <div>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 10,
+        background: 'rgba(168,85,247,0.06)',
+        border: '1px solid rgba(168,85,247,0.15)',
+        borderRadius: 8, padding: '8px 12px',
+      }}>
+        <span style={{ fontSize: 11, color: '#8892A8', fontWeight: 600 }}>세력감지 점수</span>
+        <span style={{
+          fontSize: 20, fontWeight: 800,
+          color: totalScore >= 70 ? '#C084FC' : totalScore >= 40 ? '#A855F7' : '#6B47A8',
+          fontVariantNumeric: 'tabular-nums',
+        }}>{totalScore}<span style={{ fontSize: 11, color: '#4B5675', marginLeft: 2 }}>점</span></span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map(item => <ScoreBar key={item.label} {...item} />)}
+      </div>
+      <div style={{
+        marginTop: 10, padding: '8px 12px',
+        background: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.06)',
+        borderRadius: 6, fontSize: 10, color: '#4B5675',
+        display: 'flex', justifyContent: 'space-between',
+      }}>
+        <span>거래량 {stock.volume >= 1_000_000
+          ? (stock.volume / 1_000_000).toFixed(1) + 'M'
+          : stock.volume >= 1_000
+          ? (stock.volume / 1_000).toFixed(0) + 'K'
+          : stock.volume}</span>
+        <span>52W 저 {isKr ? stock.low52Week.toLocaleString() + '원' : '$' + stock.low52Week.toFixed(2)}</span>
+        <span>52W 고 {isKr ? stock.high52Week.toLocaleString() + '원' : '$' + stock.high52Week.toFixed(2)}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── 동전주 급등 가능성 점수 패널 ──────────────────────────────
 // Java PennyStockEvaluator와 동일한 로직으로 각 항목 점수를 계산해 시각화
 function PennyScorePanel({ stock }: { stock: StockQuote }) {
@@ -376,7 +587,7 @@ function PennyScorePanel({ stock }: { stock: StockQuote }) {
   if (avg10 > 0) {
     volRatio = stock.volume / avg10
     volLabel = `${volRatio.toFixed(1)}x`
-    if      (volRatio >= 10) volScore = 400
+    if      (volRatio >= 10) volScore = 40
     else if (volRatio >=  5) volScore = 30
     else if (volRatio >=  3) volScore = 20
     else if (volRatio >=  2) volScore = 12
@@ -436,7 +647,7 @@ function PennyScorePanel({ stock }: { stock: StockQuote }) {
   ]
 
   return (
-    <div style={{ marginTop: 14 }}>
+    <div>
       {/* 총점 헤더 */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',

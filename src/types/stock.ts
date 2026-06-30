@@ -16,7 +16,8 @@ export interface StockQuote {
   eps:             number
   per:             number
   pbr:             number
-  score?:          number   // PennyStockEvaluator 100점 평가 점수 (동전주 탭 전용)
+  score?:          number   // PennyStockEvaluator 급등 가능성 점수
+  forceScore?:     number   // ForceEvaluator 세력감지 전용 점수
   debtRatio?:      number   // 부채비율 % (동전주 탭 전용, 재무 수집 후 주입)
 }
 
