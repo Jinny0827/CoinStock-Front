@@ -19,6 +19,13 @@ const NAV_ITEMS = [
   },
 ]
 
+const TRADE_ITEMS = [
+  {
+    label: '자동매매 전략', path: '/macro',
+    icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+  },
+]
+
 const AI_ITEMS = [
   {
     label: '경제 국면', path: '/economic',
@@ -45,6 +52,18 @@ export default function SideNav() {
     }}>
       <Section label="메뉴">
         {NAV_ITEMS.map(item => (
+          <NavItem
+            key={item.path}
+            label={item.label}
+            icon={item.icon}
+            active={pathname === item.path}
+            onClick={() => navigate(item.path)}
+          />
+        ))}
+      </Section>
+
+      <Section label="매매">
+        {TRADE_ITEMS.map(item => (
           <NavItem
             key={item.path}
             label={item.label}

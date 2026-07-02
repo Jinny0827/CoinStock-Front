@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getTossAccountStatus, getTossOrderbook, getTossBuyingPower, getTossSellableQuantity, placeTossOrder,
@@ -34,6 +34,13 @@ function OrderPanel({ symbol, name, side, currentPrice, onClose }: {
   symbol: string; name: string; side: 'BUY' | 'SELL'; currentPrice: number; onClose: () => void
 }) {
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   const [price, setPrice] = useState(() => String(currentPrice))
   const [quantity, setQuantity] = useState('')
   const [step, setStep] = useState<'input' | 'confirm' | 'totp' | 'totp-missing'>('input')
@@ -119,7 +126,7 @@ function OrderPanel({ symbol, name, side, currentPrice, onClose }: {
   const fmtAmount = (v: number) => currency === 'KRW' ? `${v.toLocaleString()}원` : `$${v.toLocaleString()}`
 
   return (
-    <div onClick={onClose} style={overlayStyle}>
+    <div onMouseDown={e => { if (e.target === e.currentTarget) onClose() }} style={overlayStyle}>
       <div onClick={e => e.stopPropagation()} style={panelStyle}>
         <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 2 }}>
           <span style={{ color: sideColor, marginRight: 6 }}>{side === 'BUY' ? '매수' : '매도'}</span>
@@ -186,7 +193,14 @@ function OrderPanel({ symbol, name, side, currentPrice, onClose }: {
             <div style={{ fontSize: 11, color: '#4B5675', marginTop: 6 }}>
               한정가 주문입니다 — 입력한 가격에 도달해야 체결됩니다. 호가를 클릭하면 그 가격이 채워집니다.
             </div>
-            {exceedsBuyingPower && <div style={errorStyle}>매수가능금액을 초과했습니다</div>}
+            {exceedsBuyingPower && (
+              <div>
+                <div style={errorStyle}>매수가능금액을 초과했습니다</div>
+                <div style={{ fontSize: 11, color: '#8892A8', marginTop: 6, lineHeight: 1.5 }}>
+                  💡 토스 앱 &gt; 증권 &gt; 입금에서 충전 후 다시 시도하세요
+                </div>
+              </div>
+            )}
             {exceedsSellable && <div style={errorStyle}>매도가능수량을 초과했습니다 (보유: {sellableQty?.toLocaleString()}주)</div>}
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
               <button onClick={onClose} style={{ ...secondaryBtnStyle, flex: 1 }}>닫기</button>

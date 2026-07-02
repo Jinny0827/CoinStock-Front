@@ -16,6 +16,7 @@ import ScreenerPage from './pages/ScreenerPage'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 import NotificationsPage from './pages/NotificationsPage'
+import MacroPage from './pages/MacroPage'
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -110,6 +111,7 @@ function Layout() {
                     <Route path="/economic"   element={<EconomicPhasePage />} />
                     <Route path="/screener"   element={<ScreenerPage />} />
                     <Route path="/notifications" element={<RequireAuth><NotificationsPage /></RequireAuth>} />
+                    <Route path="/macro"          element={<RequireAuth><MacroPage /></RequireAuth>} />
                 </Routes>
             </div>
             {!isDesktop && <BottomNav />}

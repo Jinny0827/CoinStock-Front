@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getAllStocks } from '../../api/stockApi'
+import { searchStocks } from '../../api/stockApi'
 import { getNotifications, markRead, markAllRead } from '../../api/notificationApi'
 import { logout as logoutApi } from '../../api/authApi'
 import { useStockStore } from '../../store/stockStore'
@@ -9,11 +9,12 @@ import { useAuthStore } from '../../store/authStore'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import MarketSessionBadge from './MarketSessionBadge'
 import coinLogo from '../../assets/coin-logo.svg'
-import type { StockQuote } from '../../types/stock'
+type SearchResult = { symbol: string; name: string; market: string }
 
 export default function AppHeader() {
   const [searchOpen, setSearchOpen]   = useState(false)
   const [query,      setQuery]        = useState('')
+  const [debouncedQ, setDebouncedQ]  = useState('')
   const [menuOpen,   setMenuOpen]     = useState(false)
   const [bellOpen,   setBellOpen]     = useState(false)
   const inputRef                      = useRef<HTMLInputElement>(null)
@@ -49,27 +50,27 @@ export default function AppHeader() {
     navigate('/login')
   }
 
-  // 검색창 열릴 때만 전체 종목 로드
-  const { data: allStocks = [] } = useQuery({
-    queryKey: ['stocks-all'],
-    queryFn:  getAllStocks,
-    staleTime: 30_000,
-    enabled:  searchOpen,
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(query.trim()), 300)
+    return () => clearTimeout(t)
+  }, [query])
+
+  const { data: searchResults = [], isFetching: searchFetching } = useQuery({
+    queryKey: ['stock-search', debouncedQ],
+    queryFn:  () => searchStocks(debouncedQ),
+    enabled:  searchOpen && debouncedQ.length >= 1,
+    staleTime: 60_000,
   })
 
-  // 입력값으로 필터 (이름 or 심볼 포함)
-  const filtered: StockQuote[] = query.trim().length === 0
-    ? allStocks.slice(0, 6)                       // 빈 쿼리 → 최근 6개
-    : allStocks
-        .filter(s =>
-          s.name  ?.toLowerCase().includes(query.toLowerCase()) ||
-          s.symbol?.toLowerCase().includes(query.toLowerCase())
-        )
-        .slice(0, 8)
-
-  function select(stock: StockQuote) {
-    setSelectedSymbol(stock.symbol)
-    setSelectedStock(stock)
+  function select(r: SearchResult) {
+    const sym = r.market === 'KR' ? r.symbol + '.KS' : r.symbol
+    setSelectedSymbol(sym)
+    setSelectedStock({
+      symbol: sym, name: r.name, market: r.market,
+      price: 0, change: 0, changePercent: 0, volume: 0,
+      marketCap: 0, high52Week: 0, low52Week: 0, avgVolume10Day: 0,
+      eps: 0, per: 0, pbr: 0,
+    })
     setSearchOpen(false)
     setQuery('')
     navigate('/')
@@ -394,20 +395,24 @@ export default function AppHeader() {
 
             {/* 결과 목록 */}
             <div style={{ padding:'4px 0', maxHeight:360, overflowY:'auto' }}>
-              {filtered.length === 0 ? (
+              {searchFetching ? (
+                <div style={{ padding:'24px 16px', textAlign:'center', fontSize:12, color:'#4B5675' }}>
+                  검색 중...
+                </div>
+              ) : searchResults.length === 0 ? (
                 <div style={{
                   padding:'24px 16px', textAlign:'center',
                   fontSize:12, color:'#4B5675',
                 }}>
-                  {query ? `"${query}" 검색 결과 없음` : '종목 데이터 로딩 중...'}
+                  {query.trim() ? `"${query}" 검색 결과 없음` : '종목명 또는 코드를 입력하세요'}
                 </div>
               ) : (
-                filtered.map(stock => (
+                searchResults.map(r => (
                   <SearchRow
-                    key={stock.symbol}
-                    stock={stock}
+                    key={r.symbol}
+                    result={r}
                     query={query}
-                    onSelect={() => select(stock)}
+                    onSelect={() => select(r)}
                   />
                 ))
               )}
@@ -432,16 +437,12 @@ export default function AppHeader() {
 
 // ── 검색 결과 행 ──────────────────────────────────────────────
 function SearchRow({
-  stock, query, onSelect,
+  result, query, onSelect,
 }: {
-  stock: StockQuote
+  result: SearchResult
   query: string
   onSelect: () => void
 }) {
-  const up     = stock.changePercent >= 0
-  const market = stock.symbol.endsWith('.KS') || stock.symbol.endsWith('.KQ')
-    ? '국장' : '미장'
-
   return (
     <div
       onClick={onSelect}
@@ -453,30 +454,16 @@ function SearchRow({
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.04)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      {/* 종목 정보 */}
       <div style={{ flex:1 }}>
         <div style={{ fontSize:13, fontWeight:600, color:'#E2E8F0' }}>
-          <Highlight text={stock.name ?? ''} query={query} />
+          <Highlight text={result.name} query={query} />
         </div>
         <div style={{ fontSize:11, color:'#4B5675', marginTop:2, display:'flex', gap:6 }}>
-          <Highlight text={stock.symbol} query={query} />
+          <Highlight text={result.symbol} query={query} />
           <span style={{
             background:'rgba(255,255,255,0.06)',
             padding:'1px 5px', borderRadius:3, fontSize:10,
-          }}>{market}</span>
-        </div>
-      </div>
-
-      {/* 가격 / 등락률 */}
-      <div style={{ textAlign:'right', flexShrink:0 }}>
-        <div style={{ fontSize:13, fontWeight:600, color:'#E2E8F0' }}>
-          {stock.price > 0 ? stock.price.toLocaleString() : '-'}
-        </div>
-        <div style={{
-          fontSize:11, fontWeight:700,
-          color: up ? '#FF8C00' : '#FF4B4B',
-        }}>
-          {up ? '▲' : '▼'} {Math.abs(stock.changePercent).toFixed(1)}%
+          }}>{result.market === 'KR' ? '국장' : '미장'}</span>
         </div>
       </div>
     </div>

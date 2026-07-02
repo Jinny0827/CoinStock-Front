@@ -32,6 +32,11 @@ export const getAllStocks      = () =>
   client.get<{ code:string; data: StockQuote[]; total:number }>('/api/stocks/current')
     .then(r => r.data.data)
 
+export const searchStocks     = (q: string) =>
+  client.get<{ code:string; data: { symbol:string; name:string; market:string }[] }>(
+    '/api/stocks/search', { params: { q } }
+  ).then(r => r.data.data)
+
 export const getIndices       = () =>
   client.get<{ code:string; data: StockQuote[] }>('/api/market/index').then(r => r.data.data)
 
