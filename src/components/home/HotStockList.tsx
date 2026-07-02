@@ -3,10 +3,11 @@ import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 import {addWatchlist, deleteWatchlist, getForceStocks, getKrPennyStocks, getUsPennyStocks, getWatchlist, isWatched} from '../../api/stockApi'
 import { useStockStore } from '../../store/stockStore'
 import { useAuthStore } from '../../store/authStore'
+import StockSearchInput from '../common/StockSearchInput'
 import type { StockQuote, WatchlistItem } from '../../types/stock'
 
 type TabType = '세력감지' | '국장' | '미장' | '관심종목'
-type RowStock = Pick<StockQuote, 'symbol' | 'name' | 'price' | 'changePercent' | 'volume' | 'score' | 'forceScore'>
+type RowStock = Pick<StockQuote, 'symbol' | 'name' | 'price' | 'changePercent' | 'volume' | 'score' | 'forceScore' | 'avgVolume10Day' | 'low52Week'>
 
 const TABS: TabType[] = ['세력감지', '국장', '미장', '관심종목']
 
@@ -20,7 +21,56 @@ const toRowStock = (w: WatchlistItem): RowStock => ({
   changePercent: w.changePercent ?? 0,
   volume: w.volume ?? 0,
   score: w.score,
+  avgVolume10Day: 0,
+  low52Week: 0,
 })
+
+function calcPennyScore(s: RowStock): number {
+  const isKr = s.symbol.endsWith('.KS') || s.symbol.endsWith('.KQ')
+  let vol = 0
+  const avg10 = s.avgVolume10Day ?? 0
+  if (avg10 > 0) {
+    const r = s.volume / avg10
+    if      (r >= 10) vol = 40
+    else if (r >=  5) vol = 30
+    else if (r >=  3) vol = 20
+    else if (r >=  2) vol = 12
+    else if (r >= 1.5) vol = 6
+  } else if (s.volume > 0) {
+    const thr = isKr ? 50_000 : 100_000
+    if      (s.volume >= thr * 10) vol = 15
+    else if (s.volume >= thr * 3)  vol = 8
+    else if (s.volume >= thr)      vol = 3
+  }
+  const chg = s.changePercent
+  let mom = 0
+  if      (chg >= 10) mom = 25
+  else if (chg >=  7) mom = 20
+  else if (chg >=  5) mom = 15
+  else if (chg >=  3) mom = 8
+  else if (chg >=  1) mom = 3
+  let low = 0
+  const low52 = s.low52Week ?? 0
+  if (low52 > 0 && s.price > 0) {
+    const fromLow = s.price / low52
+    if      (fromLow <= 1.05) low = 20
+    else if (fromLow <= 1.10) low = 15
+    else if (fromLow <= 1.20) low = 10
+    else if (fromLow <= 1.35) low = 5
+  }
+  const tv = s.price * s.volume
+  let tvScore = 0
+  if (isKr) {
+    if      (tv >= 500_000_000) tvScore = 15
+    else if (tv >= 100_000_000) tvScore = 10
+    else if (tv >=  50_000_000) tvScore = 5
+  } else {
+    if      (tv >= 1_000_000) tvScore = 15
+    else if (tv >=   500_000) tvScore = 10
+    else if (tv >=   100_000) tvScore = 5
+  }
+  return Math.min(vol + mom + low + tvScore, 100)
+}
 
 export default function HotStockList() {
   const [tab,       setTab]       = useState<TabType>('세력감지')
@@ -82,12 +132,13 @@ export default function HotStockList() {
     '관심종목': watchlistData.map(toRowStock),
   }
 
-  // 세력감지: forceScore 내림차순 / 그 외: 서버 score 순(또는 추가일 순) 유지
+  // 세력감지: forceScore 내림차순 / 국장·미장: 실시간 calcPennyScore 내림차순 / 관심종목: 추가 순
   const list = (() => {
-    const base = (tab === '세력감지'
+    const base = tab === '세력감지'
       ? listMap['세력감지'].slice().sort((a, b) => (b.forceScore ?? 0) - (a.forceScore ?? 0))
+      : tab === '국장' || tab === '미장'
+      ? listMap[tab].slice().sort((a, b) => calcPennyScore(b) - calcPennyScore(a))
       : listMap[tab].slice()
-    )
     const dir = dirFilter === 'up'   ? base.filter(s => s.changePercent > 0)
               : dirFilter === 'down' ? base.filter(s => s.changePercent < 0)
               : base
@@ -96,12 +147,12 @@ export default function HotStockList() {
 
   const maxVol = Math.max(...list.map(s => s.volume), 1)
 
-  // 홈 진입 시 세력감지 첫 번째 종목 자동 선택 — 1회만 실행
+  // 홈 진입 시 세력감지 첫 번째 종목 자동 선택 — 1회만 실행 (표시 순서와 동일한 forceScore 정렬)
   const autoSelectedRef = useRef(false)
   useEffect(() => {
     if (!autoSelectedRef.current && forceData.length > 0) {
       const sorted = forceData.slice().sort(
-        (a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent)
+        (a, b) => (b.forceScore ?? 0) - (a.forceScore ?? 0)
       )
       setSelectedSymbol(sorted[0].symbol)
       setSelectedStock(sorted[0])
@@ -313,16 +364,17 @@ function StockRow({
                                     fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
                                 }}>{stock.forceScore}점</span>
                             )
-                        ) : (
-                            stock.score != null && stock.score > 0 && (
+                        ) : (() => {
+                            const ps = calcPennyScore(stock)
+                            return ps > 0 ? (
                                 <span style={{
-                                    background: stock.score >= 70
+                                    background: ps >= 70
                                         ? 'rgba(255,140,0,0.15)' : 'rgba(61,142,255,0.12)',
-                                    color: stock.score >= 70 ? '#FF8C00' : '#3D8EFF',
+                                    color: ps >= 70 ? '#FF8C00' : '#3D8EFF',
                                     fontSize: 9, padding: '1px 5px', borderRadius: 3, fontWeight: 700,
-                                }}>{stock.score}점</span>
-                            )
-                        )}
+                                }}>{ps}점</span>
+                            ) : null
+                        })()}
                     </div>
                 </div>
 
@@ -448,13 +500,19 @@ function AddModal({ onClose, onSubmit, loading }: {
     const [symbol, setSymbol] = useState('')
     const [name,   setName]   = useState('')
 
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+        document.addEventListener('keydown', handler)
+        return () => document.removeEventListener('keydown', handler)
+    }, [onClose])
+
     return (
         <div style={{
             position: 'fixed', inset: 0,
             background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000,
-        }} onClick={onClose}>
+        }} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
             <div style={{
                 background: '#0E1525', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 10, padding: 24, width: 'min(360px, calc(100vw - 24px))',
@@ -462,21 +520,13 @@ function AddModal({ onClose, onSubmit, loading }: {
             }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>관심 종목 추가</div>
 
-                <div style={{ marginBottom: 12 }}>
-                    <label style={labelStyle}>종목코드</label>
-                    <input
-                        value={symbol} onChange={e => setSymbol(e.target.value)}
-                        placeholder="005930.KS"
-                        style={inputStyle}
-                        autoFocus
-                    />
-                </div>
                 <div style={{ marginBottom: 20 }}>
-                    <label style={labelStyle}>종목명</label>
-                    <input
-                        value={name} onChange={e => setName(e.target.value)}
-                        placeholder="삼성전자"
-                        style={inputStyle}
+                    <label style={labelStyle}>종목 검색</label>
+                    <StockSearchInput
+                        onSelect={(sym, nm) => { setSymbol(sym); setName(nm) }}
+                        selectedSymbol={symbol || undefined}
+                        selectedName={name || undefined}
+                        placeholder="종목명 / 코드 검색…"
                     />
                 </div>
 
@@ -506,8 +556,4 @@ const modalBtnStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
     fontSize: 10, color: '#4B5675', display: 'block', marginBottom: 4,
 }
-const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 10px', borderRadius: 6, fontSize: 13,
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#E2E8F0', outline: 'none', boxSizing: 'border-box',
-}
+

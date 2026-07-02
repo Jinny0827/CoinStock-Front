@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createAlert } from '../../api/notificationApi'
 
@@ -19,6 +19,12 @@ const TYPE_OPTIONS: { value: AlertType; label: string; desc: string }[] = [
 ]
 
 export default function AlertModal({ symbol, name, currentPrice, onClose }: Props) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   const [type,      setType]      = useState<AlertType>('PRICE_TARGET')
   const [direction, setDirection] = useState<Direction>('ABOVE')
   const [value,     setValue]     = useState('')
@@ -52,7 +58,7 @@ export default function AlertModal({ symbol, name, currentPrice, onClose }: Prop
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000,
       }}
-      onClick={onClose}
+      onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
         style={{

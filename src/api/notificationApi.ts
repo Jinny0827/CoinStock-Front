@@ -25,3 +25,10 @@ export const markRead = (id: number) =>
 
 export const markAllRead = () =>
   client.post('/api/notifications/read-all').then(r => r.data)
+
+export const getNotifyForce = () =>
+  client.get<{ code: string; notifyForce: boolean }>('/api/settings/notify-force')
+    .then(r => r.data.notifyForce)
+
+export const setNotifyForce = (value: boolean) =>
+  client.put('/api/settings/notify-force', { notifyForce: value }).then(r => r.data)

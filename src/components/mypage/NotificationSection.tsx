@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getAlerts, deleteAlert } from '../../api/notificationApi'
+import { getAlerts, deleteAlert, getNotifyForce, setNotifyForce } from '../../api/notificationApi'
 import { getAllStocks } from '../../api/stockApi'
 import type { AlertRule } from '../../types/notification'
 
@@ -29,6 +29,16 @@ export default function NotificationSection() {
   })
   const nameMap = Object.fromEntries(allStocks.map(s => [s.symbol, s.name ?? s.symbol]))
 
+  const { data: notifyForce = true } = useQuery({
+    queryKey: ['notify-force'],
+    queryFn: getNotifyForce,
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: setNotifyForce,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notify-force'] }),
+  })
+
   const deleteMutation = useMutation({
     mutationFn: deleteAlert,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['alerts'] }),
@@ -45,6 +55,40 @@ export default function NotificationSection() {
       <h3 style={{ margin: '0 0 14px', fontSize: 14, fontWeight: 600, color: '#E2E8F0' }}>
         내 알림 설정
       </h3>
+
+      {/* 세력감지 급등 알림 토글 */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 12px', marginBottom: 14,
+        background: 'rgba(168,85,247,0.06)',
+        border: '1px solid rgba(168,85,247,0.15)',
+        borderRadius: 8,
+      }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0' }}>세력감지 급등 알림</div>
+          <div style={{ fontSize: 11, color: '#8892A8', marginTop: 2 }}>
+            세력 점수 +20점 이상 급등 또는 80점 첫 진입 시 알림
+          </div>
+        </div>
+        <button
+          onClick={() => toggleMutation.mutate(!notifyForce)}
+          disabled={toggleMutation.isPending}
+          style={{
+            width: 42, height: 24, borderRadius: 12, border: 'none',
+            background: notifyForce ? '#A855F7' : 'rgba(255,255,255,0.1)',
+            cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{
+            position: 'absolute', top: 3,
+            left: notifyForce ? 21 : 3,
+            width: 18, height: 18, borderRadius: '50%',
+            background: '#fff', transition: 'left 0.2s',
+            display: 'block',
+          }} />
+        </button>
+      </div>
 
       {isLoading ? (
         <div style={{ fontSize: 12, color: '#4B5675', padding: '8px 0' }}>불러오는 중...</div>

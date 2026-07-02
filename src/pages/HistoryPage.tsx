@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTrades, addTrade, deleteTrade } from '../api/stockApi'
 import { getTossAccountStatus } from '../api/tossApi'
 import TossInsightView from '../components/history/TossInsightView'
+import StockSearchInput from '../components/common/StockSearchInput'
 import type { Trade } from '../types/stock'
 
 
@@ -150,6 +151,12 @@ function TradeModal({ onClose, onSubmit, loading }: {
     onSubmit: (data: Omit<Trade, 'id'>) => void
     loading: boolean
 }) {
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+        document.addEventListener('keydown', handler)
+        return () => document.removeEventListener('keydown', handler)
+    }, [onClose])
+
     const [form, setForm] = useState({
         symbol: '', name: '', side: 'buy' as 'buy' | 'sell',
         price: '', qty: '', fee: '0', memo: '', tradedAt: today(),
@@ -173,7 +180,7 @@ function TradeModal({ onClose, onSubmit, loading }: {
             background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000,
-        }} onClick={onClose}>
+        }} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
             <div style={{
                 background: '#0E1525', border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 10, padding: 24, width: 'min(400px, calc(100vw - 24px))',
@@ -181,9 +188,14 @@ function TradeModal({ onClose, onSubmit, loading }: {
             }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>거래 추가</div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <Field label="종목코드" value={form.symbol} onChange={set('symbol')} placeholder="005930.KS" />
-                    <Field label="종목명" value={form.name} onChange={set('name')} placeholder="삼성전자" />
+                <div style={{ marginBottom: 10 }}>
+                    <label style={labelStyle}>종목 검색</label>
+                    <StockSearchInput
+                        onSelect={(sym, nm) => setForm(f => ({ ...f, symbol: sym, name: nm }))}
+                        selectedSymbol={form.symbol || undefined}
+                        selectedName={form.name || undefined}
+                        placeholder="종목명 / 코드 검색…"
+                    />
                 </div>
 
                 <div style={{ margin: '10px 0' }}>
